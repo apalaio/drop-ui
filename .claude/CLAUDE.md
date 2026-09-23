@@ -1,3 +1,10 @@
+DropUI is a drag & drop ui builder. The user selects a ui element type from the navigation-style menu and drags it in the UI. In that way, the user can create a full client ui just by dragging and dropping on the page.
+
+## Agent behavior
+
+- Don't EVER, under any circumstances git commit anything. You are BANNED from commiting even the tiniest change.
+
+
 ## Architecture
 
 - We use NgRx SignalStore for all state management. Never use RxJS BehaviorSubjects for local state.
