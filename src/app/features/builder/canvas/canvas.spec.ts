@@ -8,4 +8,10 @@ describe('Canvas', () => {
     expect(screen.getByRole('region', { name: 'Canvas' })).toBeTruthy();
     expect(screen.getByText('Drop elements here')).toBeTruthy();
   });
+
+  it('renders the canvas as a drop zone', async () => {
+    await render(Canvas);
+
+    expect(screen.getByRole('region', { name: 'Canvas' }).classList).toContain('cdk-drop-list');
+  });
 });

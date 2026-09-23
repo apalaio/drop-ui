@@ -12,7 +12,7 @@
       "schematics": {},
       "root": "",
       "sourceRoot": "src",
-      "prefix": "app",
+      "prefix": "dui",
       "architect": {
         "build": {
           "builder": "@angular/build:application",

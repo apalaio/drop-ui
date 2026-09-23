@@ -11,6 +11,10 @@ DropUI is a drag & drop ui builder. The user selects a ui element type from the 
 - Feature modules follow the feature-driven directory structure: `src/app/features/[feature-name]/`.
 - For UI components we use Angular CDK + Angular Aria
 
+## Conventions
+
+- Component (and directive) selectors use the `dui` prefix, never `app`: e.g. `dui-canvas`, `dui-element-palette`. The CLI prefix is set to `dui` in `angular.json`, so `ng generate` produces it automatically.
+
 ## Styling
 
 - We use Tailwind and on top of it DaisyUI, which is a tailwind based collection of class names

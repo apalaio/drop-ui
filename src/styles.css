@@ -1,2 +1,28 @@
 @import 'tailwindcss';
 @plugin "daisyui";
+
+/* Angular CDK drag & drop feedback. Global because the drag preview is appended to <body>. */
+.cdk-drag-preview {
+  @apply rounded-field shadow-lg;
+}
+
+.cdk-drag-placeholder {
+  @apply opacity-40;
+}
+
+/* Copy left behind in the palette while its item is being dragged out. */
+.cdk-drag-anchor {
+  @apply opacity-100;
+}
+
+.cdk-drag-animating {
+  transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.canvas-drop-zone.cdk-drop-list-receiving {
+  @apply border-primary/50;
+}
+
+.canvas-drop-zone.cdk-drop-list-dragging {
+  @apply border-primary bg-primary/5;
+}

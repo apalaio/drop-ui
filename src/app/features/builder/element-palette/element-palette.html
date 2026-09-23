@@ -1,2 +1,19 @@
 <h2 class="mb-2 text-xs font-semibold tracking-wide text-base-content/60 uppercase">Elements</h2>
-<p class="text-sm text-base-content/50">No elements available yet.</p>
+
+<ul
+  id="palette-drop-list"
+  class="menu w-full gap-1 p-0"
+  cdkDropList
+  cdkDropListSortingDisabled
+  cdkDropListHasAnchor
+  [cdkDropListEnterPredicate]="acceptNothing"
+>
+  @for (item of store.paletteItems(); track item.uid) {
+    <li cdkDrag [cdkDragData]="item" [attr.data-uid]="item.uid">
+      <div class="cursor-grab justify-between rounded-field border border-base-300 bg-base-100">
+        <span>{{ item.label }}</span>
+        <code class="text-xs text-base-content/50">&lt;{{ item.type }}&gt;</code>
+      </div>
+    </li>
+  }
+</ul>
