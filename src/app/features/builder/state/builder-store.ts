@@ -10,7 +10,10 @@ interface BuilderState {
 }
 
 const createInitialState = (): BuilderState => ({
-  paletteItems: [{ uid: crypto.randomUUID(), type: 'div', label: 'Div' }],
+  paletteItems: [
+    { uid: crypto.randomUUID(), type: 'div', label: 'Div' },
+    { uid: crypto.randomUUID(), type: 'span', label: 'Span' },
+  ],
   canvasElements: [],
 });
 

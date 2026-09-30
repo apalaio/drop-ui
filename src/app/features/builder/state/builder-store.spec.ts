@@ -2,10 +2,10 @@ import { TestBed } from '@angular/core/testing';
 import { BuilderStore } from './builder-store';
 
 describe('BuilderStore', () => {
-  it('provides a div palette item', () => {
+  it('provides div and span palette items', () => {
     const store = TestBed.inject(BuilderStore);
 
-    expect(store.paletteItems().map((item) => item.type)).toEqual(['div']);
+    expect(store.paletteItems().map((item) => item.type)).toEqual(['div', 'span']);
   });
 
   it('gives every palette item a unique uid', () => {

@@ -1,4 +1,4 @@
-export type ElementType = 'div';
+export type ElementType = 'div' | 'span';
 
 export interface PaletteItem {
   /** Unique per item, distinguishes it from every other item in the palette. */
