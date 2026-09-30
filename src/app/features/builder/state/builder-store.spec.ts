@@ -83,6 +83,21 @@ describe('BuilderStore', () => {
     });
   });
 
+  describe('removeElement', () => {
+    it('removes the matching element only, keeping the order of the rest', () => {
+      const store = TestBed.inject(BuilderStore);
+      const [div] = store.paletteItems();
+      store.addElement(div, 0);
+      store.addElement(div, 1);
+      store.addElement(div, 2);
+      const [a, b, c] = store.canvasElements().map((element) => element.uid);
+
+      store.removeElement(b);
+
+      expect(store.canvasElements().map((element) => element.uid)).toEqual([a, c]);
+    });
+  });
+
   describe('moveElement', () => {
     it('reorders canvas elements', () => {
       const store = TestBed.inject(BuilderStore);

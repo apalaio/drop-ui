@@ -9,11 +9,11 @@ describe('DroppedElement', () => {
   const div: CanvasElement = { uid: 'element-1', type: 'div', paletteUid: 'palette-div', text: 'enter text' };
   const span: CanvasElement = { uid: 'element-2', type: 'span', paletteUid: 'palette-span', text: 'enter text' };
 
-  let store: { updateText: ReturnType<typeof vi.fn> };
-  let dialogResult: Observable<string | undefined>;
+  let store: { updateText: ReturnType<typeof vi.fn>; removeElement: ReturnType<typeof vi.fn> };
+  let dialogResult: Observable<string | true | undefined>;
 
   beforeEach(() => {
-    store = { updateText: vi.fn() };
+    store = { updateText: vi.fn(), removeElement: vi.fn() };
     dialogResult = of(undefined);
     TestBed.configureTestingModule({
       providers: [
@@ -66,6 +66,22 @@ describe('DroppedElement', () => {
       create(div).componentInstance['editText']();
 
       expect(store.updateText).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('deleteElement', () => {
+    it('removes the element once the user confirms', () => {
+      dialogResult = of(true);
+
+      create(div).componentInstance['deleteElement']();
+
+      expect(store.removeElement).toHaveBeenCalledWith(div.uid);
+    });
+
+    it('keeps the element when the user cancels', () => {
+      create(div).componentInstance['deleteElement']();
+
+      expect(store.removeElement).not.toHaveBeenCalled();
     });
   });
 });

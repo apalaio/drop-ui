@@ -1,6 +1,7 @@
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { Component, computed, inject, input } from '@angular/core';
+import { openConfirmationDialog } from '../../../shared/confirmation-dialog/confirmation-dialog';
 import { openTextInputDialog } from '../../../shared/text-input-dialog/text-input-dialog';
 import { CanvasElement } from '../models/canvas-element';
 import { ElementType } from '../models/palette-item';
@@ -41,6 +42,19 @@ export class DroppedElement {
     }).subscribe((newText) => {
       if (newText !== undefined) {
         this.store.updateText(uid, newText);
+      }
+    });
+  }
+
+  protected deleteElement(): void {
+    const { uid, type } = this.element();
+    openConfirmationDialog(this.dialog, {
+      title: 'Delete element',
+      description: `Remove this <${type}> from the canvas? This cannot be undone.`,
+      confirmLabel: 'Delete',
+    }).subscribe((confirmed) => {
+      if (confirmed) {
+        this.store.removeElement(uid);
       }
     });
   }

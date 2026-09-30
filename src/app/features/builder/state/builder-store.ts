@@ -43,6 +43,11 @@ export const BuilderStore = signalStore(
         ),
       }));
     },
+    removeElement(uid: string): void {
+      patchState(store, ({ canvasElements }) => ({
+        canvasElements: canvasElements.filter((element) => element.uid !== uid),
+      }));
+    },
     moveElement(fromIndex: number, toIndex: number): void {
       patchState(store, ({ canvasElements }) => {
         const reordered = [...canvasElements];

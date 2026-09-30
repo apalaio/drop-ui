@@ -50,3 +50,25 @@ test('edits the text of a dropped element through its actions menu', async ({ pa
   await expect(div).toHaveText('Hello world');
   await expect(canvas.getByTestId('dropped-div')).toHaveCount(1);
 });
+
+test('deletes a dropped element through its actions menu after confirming', async ({ page }) => {
+  await page.goto('/');
+  const palette = page.getByRole('complementary', { name: 'Element palette' });
+  const canvas = page.getByRole('region', { name: 'Canvas' });
+
+  await drag(page, palette.getByRole('listitem').filter({ hasText: 'Div' }), canvas);
+  await expect(canvas.getByTestId('dropped-div')).toHaveCount(1);
+
+  const openDeleteDialog = async () => {
+    await canvas.getByRole('button', { name: 'Element actions' }).click();
+    await page.getByRole('menuitem', { name: 'Delete element' }).click();
+    return page.getByRole('dialog', { name: 'Delete element' });
+  };
+
+  await (await openDeleteDialog()).getByRole('button', { name: 'Cancel' }).click();
+  await expect(canvas.getByTestId('dropped-div')).toHaveCount(1);
+
+  await (await openDeleteDialog()).getByRole('button', { name: 'Delete' }).click();
+  await expect(canvas.getByTestId('dropped-div')).toHaveCount(0);
+  await expect(canvas.getByText('Drop elements here')).toBeVisible();
+});

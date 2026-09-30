@@ -52,10 +52,23 @@ describe(DroppedElement.name, () => {
   describe('actions menu', () => {
     beforeEach(async () => mount(div));
 
-    it('should open with an edit text action when the actions button is clicked', async () => {
+    it('should list edit text then delete element when the actions button is clicked', async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Element actions' }));
 
-      expect(await screen.findByRole('menuitem', { name: 'Edit text' })).toBeInTheDocument();
+      await screen.findByRole('menu');
+      const actions = screen.getAllByRole('menuitem').map((item) => item.textContent?.trim());
+
+      expect(actions).toEqual(['Edit text', 'Delete element']);
+    });
+
+    it('should open the delete confirmation from the delete element action', async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Element actions' }));
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete element' }));
+
+      const dialog = await screen.findByRole('dialog', { name: 'Delete element' });
+
+      expect(dialog).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
     });
 
     it('should open the edit text dialog, prefilled with the element text, from the edit text action', async () => {
