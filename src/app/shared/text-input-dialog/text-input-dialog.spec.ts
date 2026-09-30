@@ -1,5 +1,6 @@
 import { Dialog, DialogRef } from '@angular/cdk/dialog';
 import { TestBed } from '@angular/core/testing';
+import { submit } from '@angular/forms/signals';
 import { openTextInputDialog, TextInputDialogComponent } from './text-input-dialog';
 
 describe('TextInputDialogComponent', () => {
@@ -15,12 +16,20 @@ describe('TextInputDialogComponent', () => {
     dialog = fixture.componentInstance;
   });
 
-  it('closes with the entered text on save', () => {
-    dialog['text'].set('Hello');
+  it('closes with the entered text on submit', async () => {
+    dialog['model'].set({ text: 'Hello' });
 
-    dialog['save']();
+    await submit(dialog['textForm']);
 
     expect(dialogRef.close).toHaveBeenCalledWith('Hello');
+  });
+
+  it('stays open when submitted with blank text', async () => {
+    dialog['model'].set({ text: '   ' });
+
+    await submit(dialog['textForm']);
+
+    expect(dialogRef.close).not.toHaveBeenCalled();
   });
 
   it('closes without a result on cancel', () => {

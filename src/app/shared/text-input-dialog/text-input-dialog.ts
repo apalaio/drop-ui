@@ -1,28 +1,30 @@
 import { Dialog, DialogRef } from '@angular/cdk/dialog';
 import { Component, inject, input, inputBinding, linkedSignal } from '@angular/core';
+import { form, FormField, FormRoot, validate } from '@angular/forms/signals';
 import { Observable } from 'rxjs';
 
-/** Modal asking the user for a single line of text. Closes with the entered text on save, `undefined` on cancel. */
 @Component({
   selector: 'dui-text-input-dialog',
+  imports: [FormRoot, FormField],
   templateUrl: './text-input-dialog.html',
   host: { class: 'block w-[min(28rem,90vw)] rounded-box bg-base-100 p-6 shadow-xl' },
 })
 export class TextInputDialogComponent {
   readonly title = input.required<string>();
   readonly description = input('');
-  /** Initial content of the text input. */
   readonly value = input('');
 
-  protected readonly text = linkedSignal(() => this.value());
   private readonly dialogRef = inject<DialogRef<string>>(DialogRef);
+
+  protected readonly model = linkedSignal(() => ({ text: this.value() }));
+  protected readonly textForm = form(
+    this.model,
+    (path) => validate(path.text, ({ value }) => (value().trim() ? undefined : { kind: 'blank' })),
+    { submission: { action: async () => this.dialogRef.close(this.model().text) } },
+  );
 
   protected cancel(): void {
     this.dialogRef.close();
-  }
-
-  protected save(): void {
-    this.dialogRef.close(this.text());
   }
 }
 
@@ -32,10 +34,6 @@ export interface TextInputDialogOptions {
   value?: string;
 }
 
-/**
- * Opens a {@link TextInputDialogComponent}.
- * @returns Emits once on close: the entered text on save, `undefined` on cancel or backdrop click.
- */
 export function openTextInputDialog(
   dialog: Dialog,
   { title, description = '', value = '' }: TextInputDialogOptions,

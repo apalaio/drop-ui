@@ -1,4 +1,4 @@
-<form class="flex flex-col gap-4" (submit)="$event.preventDefault(); save()">
+<form class="flex flex-col gap-4" [formRoot]="textForm">
   <h2 class="text-lg font-semibold">{{ title() }}</h2>
 
   @if (description()) {
@@ -7,11 +7,11 @@
 
   <label class="input w-full">
     <span class="sr-only">Text</span>
-    <input type="text" class="grow" cdkFocusInitial [value]="text()" (input)="text.set($any($event.target).value)" />
+    <input type="text" class="grow" cdkFocusInitial [formField]="textForm.text" />
   </label>
 
   <div class="flex justify-end gap-2">
     <button type="button" class="btn btn-ghost" (click)="cancel()">Cancel</button>
-    <button type="submit" class="btn btn-primary" [disabled]="!text().trim()">Save</button>
+    <button type="submit" class="btn btn-primary" [disabled]="textForm().invalid()">Save</button>
   </div>
 </form>

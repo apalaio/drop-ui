@@ -2,7 +2,9 @@ import { Dialog, DialogRef } from '@angular/cdk/dialog';
 import { Component, inject, input, inputBinding } from '@angular/core';
 import { map, Observable } from 'rxjs';
 
-/** Modal asking the user to confirm an action. Closes with `true` on confirm, `undefined` on cancel. */
+/** Label of the confirm button when the caller gives none. */
+export const DEFAULT_CONFIRM_LABEL = 'Confirm';
+
 @Component({
   selector: 'dui-confirmation-dialog',
   templateUrl: './confirmation-dialog.html',
@@ -11,7 +13,7 @@ import { map, Observable } from 'rxjs';
 export class ConfirmationDialogComponent {
   readonly title = input.required<string>();
   readonly description = input('');
-  readonly confirmLabel = input('Save');
+  readonly confirmLabel = input(DEFAULT_CONFIRM_LABEL);
 
   private readonly dialogRef = inject<DialogRef<true>>(DialogRef);
 
@@ -30,13 +32,9 @@ export interface ConfirmationDialogOptions {
   confirmLabel?: string;
 }
 
-/**
- * Opens a {@link ConfirmationDialogComponent}.
- * @returns Emits once on close: `true` if the user confirmed, `false` on cancel or backdrop click.
- */
 export function openConfirmationDialog(
   dialog: Dialog,
-  { title, description = '', confirmLabel = 'Save' }: ConfirmationDialogOptions,
+  { title, description = '', confirmLabel = DEFAULT_CONFIRM_LABEL }: ConfirmationDialogOptions,
 ): Observable<boolean> {
   return dialog
     .open<true>(ConfirmationDialogComponent, {

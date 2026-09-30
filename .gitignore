@@ -38,6 +38,8 @@ yarn-error.log
 testem.log
 /typings
 __screenshots__/
+# Vitest browser-mode failure screenshots
+/.vitest-attachments/
 
 # Playwright
 /test-results/

@@ -1,11 +1,32 @@
-import { DialogRef } from '@angular/cdk/dialog';
-import { fireEvent, render, screen } from '@testing-library/angular';
-import { TextInputDialogComponent } from './text-input-dialog';
+import { Dialog, DialogRef } from '@angular/cdk/dialog';
+import { Component, inject, signal } from '@angular/core';
+import { fireEvent, render, screen, waitFor } from '@testing-library/angular';
+import { openTextInputDialog, TextInputDialogComponent } from './text-input-dialog';
+
+const title = 'Edit text';
+const value = 'enter text';
+const cancelled = 'cancelled';
+
+@Component({
+  selector: 'dui-text-input-dialog-host',
+  template: `
+    <button type="button" (click)="open()">Open</button>
+    <output>{{ result() }}</output>
+  `,
+})
+class DialogHost {
+  private readonly dialog = inject(Dialog);
+  protected readonly result = signal('');
+
+  protected open(): void {
+    openTextInputDialog(this.dialog, { title, value }).subscribe((text) =>
+      this.result.set(text ?? cancelled),
+    );
+  }
+}
 
 describe(TextInputDialogComponent.name, () => {
-  const title = 'Edit text';
   const description = 'Change the text.';
-  const value = 'enter text';
 
   async function mount(inputs: { description?: string; value?: string } = {}) {
     return render(TextInputDialogComponent, {
@@ -53,6 +74,31 @@ describe(TextInputDialogComponent.name, () => {
       fireEvent.input(screen.getByRole('textbox', { name: 'Text' }), { target: { value: '   ' } });
 
       expect(await screen.findByRole('button', { name: 'Save' })).toBeDisabled();
+    });
+  });
+
+  describe('when opened', () => {
+    beforeEach(async () => {
+      await render(DialogHost);
+      fireEvent.click(screen.getByRole('button', { name: 'Open' }));
+      await screen.findByRole('dialog', { name: title });
+    });
+
+    it('should close with the entered text when saved', async () => {
+      fireEvent.input(screen.getByRole('textbox', { name: 'Text' }), {
+        target: { value: 'Hello' },
+      });
+      fireEvent.click(await screen.findByRole('button', { name: 'Save' }));
+
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      expect(screen.getByRole('status')).toHaveTextContent('Hello');
+    });
+
+    it('should close without a result when cancelled', async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      expect(screen.getByRole('status')).toHaveTextContent(cancelled);
     });
   });
 });
