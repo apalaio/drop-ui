@@ -7,4 +7,6 @@ export interface CanvasElement {
   type: ElementType;
   /** uid of the palette item this element was created from. */
   paletteUid: string;
+  /** Text content rendered inside the element. */
+  text: string;
 }

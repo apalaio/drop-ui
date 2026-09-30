@@ -29,3 +29,24 @@ test('drops a div and a span from the palette onto the canvas', async ({ page })
   );
   expect(types.sort()).toEqual(['div', 'span']);
 });
+
+test('edits the text of a dropped element through its actions menu', async ({ page }) => {
+  await page.goto('/');
+  const palette = page.getByRole('complementary', { name: 'Element palette' });
+  const canvas = page.getByRole('region', { name: 'Canvas' });
+
+  await drag(page, palette.getByRole('listitem').filter({ hasText: 'Div' }), canvas);
+  const div = canvas.getByTestId('dropped-div');
+  await expect(div).toHaveText('enter text');
+
+  await canvas.getByRole('button', { name: 'Element actions' }).click();
+  await page.getByRole('menuitem', { name: 'Edit text' }).click();
+
+  const dialog = page.getByRole('dialog', { name: 'Edit text' });
+  await dialog.getByRole('textbox', { name: 'Text' }).fill('Hello world');
+  await dialog.getByRole('button', { name: 'Save' }).click();
+
+  await expect(dialog).toBeHidden();
+  await expect(div).toHaveText('Hello world');
+  await expect(canvas.getByTestId('dropped-div')).toHaveCount(1);
+});

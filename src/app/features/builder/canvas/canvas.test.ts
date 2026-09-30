@@ -6,8 +6,8 @@ import { Canvas } from './canvas';
 
 describe(Canvas.name, () => {
   const dropHint = 'Drop elements here';
-  const first: CanvasElement = { uid: 'element-1', type: 'div', paletteUid: 'palette-div' };
-  const second: CanvasElement = { uid: 'element-2', type: 'div', paletteUid: 'palette-div' };
+  const first: CanvasElement = { uid: 'element-1', type: 'div', paletteUid: 'palette-div', text: 'enter text' };
+  const second: CanvasElement = { uid: 'element-2', type: 'div', paletteUid: 'palette-div', text: 'enter text' };
 
   async function mount(canvasElements: CanvasElement[]) {
     return render(Canvas, {

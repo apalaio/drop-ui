@@ -1,4 +1,6 @@
 @import 'tailwindcss';
+/* Positioning and backdrops for CDK overlays: the element actions menu and dialogs. */
+@import '@angular/cdk/overlay-prebuilt.css';
 @plugin "daisyui";
 
 /* Angular CDK drag & drop feedback. Global because the drag preview is appended to <body>. */

@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { BuilderStore } from './builder-store';
+import { BuilderStore, DEFAULT_ELEMENT_TEXT } from './builder-store';
 
 describe('BuilderStore', () => {
   it('provides div and span palette items', () => {
@@ -58,6 +58,28 @@ describe('BuilderStore', () => {
       const [, middle] = store.canvasElements().map((element) => element.uid);
 
       expect(store.canvasElements().map((element) => element.uid)).toEqual([first, middle, last]);
+    });
+
+    it('starts the element with the default text', () => {
+      const store = TestBed.inject(BuilderStore);
+
+      store.addElement(store.paletteItems()[0], 0);
+
+      expect(store.canvasElements()[0].text).toBe(DEFAULT_ELEMENT_TEXT);
+    });
+  });
+
+  describe('updateText', () => {
+    it('changes the text of the matching element only', () => {
+      const store = TestBed.inject(BuilderStore);
+      const [div] = store.paletteItems();
+      store.addElement(div, 0);
+      store.addElement(div, 1);
+      const [first, second] = store.canvasElements();
+
+      store.updateText(second.uid, 'Hello');
+
+      expect(store.canvasElements().map((element) => element.text)).toEqual([first.text, 'Hello']);
     });
   });
 

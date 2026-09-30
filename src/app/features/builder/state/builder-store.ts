@@ -9,6 +9,9 @@ interface BuilderState {
   canvasElements: CanvasElement[];
 }
 
+/** Text a freshly dropped element starts with, until the user edits it. */
+export const DEFAULT_ELEMENT_TEXT = 'enter text';
+
 const createInitialState = (): BuilderState => ({
   paletteItems: [
     { uid: crypto.randomUUID(), type: 'div', label: 'Div' },
@@ -27,9 +30,17 @@ export const BuilderStore = signalStore(
         uid: crypto.randomUUID(),
         type: item.type,
         paletteUid: item.uid,
+        text: DEFAULT_ELEMENT_TEXT,
       };
       patchState(store, ({ canvasElements }) => ({
         canvasElements: [...canvasElements.slice(0, index), element, ...canvasElements.slice(index)],
+      }));
+    },
+    updateText(uid: string, text: string): void {
+      patchState(store, ({ canvasElements }) => ({
+        canvasElements: canvasElements.map((element) =>
+          element.uid === uid ? { ...element, text } : element,
+        ),
       }));
     },
     moveElement(fromIndex: number, toIndex: number): void {

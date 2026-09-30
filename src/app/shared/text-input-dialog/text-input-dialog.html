@@ -1,0 +1,17 @@
+<form class="flex flex-col gap-4" (submit)="$event.preventDefault(); save()">
+  <h2 class="text-lg font-semibold">{{ title() }}</h2>
+
+  @if (description()) {
+    <p class="text-sm text-base-content/70" data-testid="dialog-description">{{ description() }}</p>
+  }
+
+  <label class="input w-full">
+    <span class="sr-only">Text</span>
+    <input type="text" class="grow" cdkFocusInitial [value]="text()" (input)="text.set($any($event.target).value)" />
+  </label>
+
+  <div class="flex justify-end gap-2">
+    <button type="button" class="btn btn-ghost" (click)="cancel()">Cancel</button>
+    <button type="submit" class="btn btn-primary" [disabled]="!text().trim()">Save</button>
+  </div>
+</form>
