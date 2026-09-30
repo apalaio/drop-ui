@@ -3,6 +3,7 @@ DropUI is a drag & drop ui builder. The user selects a ui element type from the 
 ## Agent behavior
 
 - Don't EVER, under any circumstances git commit anything. You are BANNED from commiting even the tiniest change.
+- Every time a task is completed, run all three test suites (`npm test -- --watch=false`, `npm run test:components -- --watch=false` and `npm run e2e`) and make sure they pass. A task is not done until all tests are green.
 
 
 ## Architecture
@@ -21,5 +22,4 @@ DropUI is a drag & drop ui builder. The user selects a ui element type from the 
 
 ## Testing
 
-- We use Vitest. Do not generate Karma or Jasmine configuration files.
-- All components must have a corresponding `.spec.ts` file utilizing Angular Testing Library, not standard TestBed fixture methods.
+- Vitest for unit (`*.spec.ts`, jsdom) and component (`*.test.ts`, real Chromium) tests, Playwright for E2E (`*.e2e.ts`). Before writing or running tests, load the `testing` skill: [skills/testing/SKILL.md](skills/testing/SKILL.md).

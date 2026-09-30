@@ -64,7 +64,20 @@
           "defaultConfiguration": "development"
         },
         "test": {
-          "builder": "@angular/build:unit-test"
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "include": ["src/**/*.spec.ts"],
+            "setupFiles": ["src/test-setup.ts"]
+          }
+        },
+        "test-components": {
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "tsConfig": "tsconfig.test.json",
+            "include": ["src/**/*.test.ts"],
+            "setupFiles": ["src/test-setup.browser.ts", "src/test-setup.ts"],
+            "browsers": ["chromiumHeadless"]
+          }
         }
       }
     }

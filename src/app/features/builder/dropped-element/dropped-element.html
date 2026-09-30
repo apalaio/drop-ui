@@ -1,0 +1,9 @@
+<span class="badge badge-ghost badge-xs absolute top-2 right-2 opacity-0 group-hover:opacity-100">
+  {{ element().type }}
+</span>
+
+@switch (element().type) {
+  @case ('div') {
+    <div class="min-h-16 rounded-field bg-base-200" data-testid="dropped-div"></div>
+  }
+}

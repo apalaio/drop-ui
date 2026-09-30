@@ -1,17 +1,41 @@
-import { render, screen } from '@testing-library/angular';
+import { CdkDragDrop } from '@angular/cdk/drag-drop';
+import { TestBed } from '@angular/core/testing';
+import { CanvasElement } from '../models/canvas-element';
+import { PaletteItem } from '../models/palette-item';
+import { BuilderStore } from '../state/builder-store';
 import { Canvas } from './canvas';
 
-describe('Canvas', () => {
-  it('renders an empty canvas region with a drop hint', async () => {
-    await render(Canvas);
+type DropEvent = CdkDragDrop<unknown, unknown, PaletteItem | CanvasElement>;
 
-    expect(screen.getByRole('region', { name: 'Canvas' })).toBeTruthy();
-    expect(screen.getByText('Drop elements here')).toBeTruthy();
+describe('Canvas', () => {
+  const canvasList = { id: 'canvas' };
+  const paletteList = { id: 'palette' };
+  const divItem: PaletteItem = { uid: 'palette-div', type: 'div', label: 'Div' };
+
+  let store: { addElement: ReturnType<typeof vi.fn>; moveElement: ReturnType<typeof vi.fn> };
+  let canvas: Canvas;
+
+  beforeEach(() => {
+    store = { addElement: vi.fn(), moveElement: vi.fn() };
+    TestBed.configureTestingModule({ providers: [{ provide: BuilderStore, useValue: store }] });
+    canvas = TestBed.runInInjectionContext(() => new Canvas());
   });
 
-  it('renders the canvas as a drop zone', async () => {
-    await render(Canvas);
+  function drop(event: Record<string, unknown>): void {
+    canvas['drop']({ container: canvasList, ...event } as unknown as DropEvent);
+  }
 
-    expect(screen.getByRole('region', { name: 'Canvas' }).classList).toContain('cdk-drop-list');
+  it('adds a palette item dropped from the palette at the drop index', () => {
+    drop({ previousContainer: paletteList, item: { data: divItem }, currentIndex: 2 });
+
+    expect(store.addElement).toHaveBeenCalledWith(divItem, 2);
+    expect(store.moveElement).not.toHaveBeenCalled();
+  });
+
+  it('reorders an element dragged within the canvas', () => {
+    drop({ previousContainer: canvasList, previousIndex: 0, currentIndex: 3 });
+
+    expect(store.moveElement).toHaveBeenCalledWith(0, 3);
+    expect(store.addElement).not.toHaveBeenCalled();
   });
 });

@@ -1,0 +1,8 @@
+/* Component tests (*.test.ts), run in real Chromium via Vitest browser mode. */
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["vitest/globals"]
+  },
+  "include": ["src/**/*.d.ts", "src/test-setup.ts", "src/test-setup.browser.ts","src/**/*.test.ts"]
+}
