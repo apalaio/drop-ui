@@ -6,8 +6,9 @@ import { BuilderStore } from '../state/builder-store';
 import { DroppedElement } from './dropped-element';
 
 describe('DroppedElement', () => {
-  const div: CanvasElement = { uid: 'element-1', type: 'div', paletteUid: 'palette-div', text: 'enter text' };
-  const span: CanvasElement = { uid: 'element-2', type: 'span', paletteUid: 'palette-span', text: 'enter text' };
+  const cell = { row: 0, column: 0 };
+  const div: CanvasElement = { uid: 'element-1', type: 'div', paletteUid: 'palette-div', text: 'enter text', ...cell };
+  const span: CanvasElement = { ...div, uid: 'element-2', type: 'span', paletteUid: 'palette-span' };
 
   let store: { updateText: ReturnType<typeof vi.fn>; removeElement: ReturnType<typeof vi.fn> };
   let dialogResult: Observable<string | true | undefined>;

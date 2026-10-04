@@ -1,7 +1,7 @@
 import { Dialog, DialogRef } from '@angular/cdk/dialog';
 import { Component, inject, signal } from '@angular/core';
 import { fireEvent, render, screen, waitFor } from '@testing-library/angular';
-import { openTextInputDialog, TextInputDialogComponent } from './text-input-dialog';
+import { openTextInputDialog, TextInputDialog } from './text-input-dialog';
 
 const title = 'Edit text';
 const value = 'enter text';
@@ -25,11 +25,11 @@ class DialogHost {
   }
 }
 
-describe(TextInputDialogComponent.name, () => {
+describe(TextInputDialog.name, () => {
   const description = 'Change the text.';
 
   async function mount(inputs: { description?: string; value?: string } = {}) {
-    return render(TextInputDialogComponent, {
+    return render(TextInputDialog, {
       inputs: { title, ...inputs },
       providers: [{ provide: DialogRef, useValue: { close: () => undefined } }],
     });

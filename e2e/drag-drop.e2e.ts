@@ -1,6 +1,5 @@
 import { expect, Locator, Page, test } from '@playwright/test';
 
-/** CDK drag needs real, incremental pointer movement past its drag threshold — `dragTo` jumps too far at once. */
 async function drag(page: Page, source: Locator, target: Locator): Promise<void> {
   const from = await source.boundingBox();
   const to = await target.boundingBox();
@@ -15,7 +14,7 @@ async function drag(page: Page, source: Locator, target: Locator): Promise<void>
 
 test('drops a div and a span from the palette onto the canvas', async ({ page }) => {
   await page.goto('/');
-  const palette = page.getByRole('complementary', { name: 'Element palette' });
+  const palette = page.getByRole('complementary', { name: 'Sidebar' });
   const canvas = page.getByRole('region', { name: 'Canvas' });
 
   await drag(page, palette.getByRole('listitem').filter({ hasText: 'Div' }), canvas);
@@ -32,7 +31,7 @@ test('drops a div and a span from the palette onto the canvas', async ({ page })
 
 test('edits the text of a dropped element through its actions menu', async ({ page }) => {
   await page.goto('/');
-  const palette = page.getByRole('complementary', { name: 'Element palette' });
+  const palette = page.getByRole('complementary', { name: 'Sidebar' });
   const canvas = page.getByRole('region', { name: 'Canvas' });
 
   await drag(page, palette.getByRole('listitem').filter({ hasText: 'Div' }), canvas);
@@ -53,7 +52,7 @@ test('edits the text of a dropped element through its actions menu', async ({ pa
 
 test('deletes a dropped element through its actions menu after confirming', async ({ page }) => {
   await page.goto('/');
-  const palette = page.getByRole('complementary', { name: 'Element palette' });
+  const palette = page.getByRole('complementary', { name: 'Sidebar' });
   const canvas = page.getByRole('region', { name: 'Canvas' });
 
   await drag(page, palette.getByRole('listitem').filter({ hasText: 'Div' }), canvas);

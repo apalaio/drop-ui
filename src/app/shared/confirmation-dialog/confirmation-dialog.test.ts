@@ -2,7 +2,7 @@ import { Dialog, DialogRef } from '@angular/cdk/dialog';
 import { Component, inject, signal } from '@angular/core';
 import { fireEvent, render, screen, waitFor } from '@testing-library/angular';
 import {
-  ConfirmationDialogComponent,
+  ConfirmationDialog,
   DEFAULT_CONFIRM_LABEL,
   openConfirmationDialog,
 } from './confirmation-dialog';
@@ -28,11 +28,11 @@ class DialogHost {
   }
 }
 
-describe(ConfirmationDialogComponent.name, () => {
+describe(ConfirmationDialog.name, () => {
   const description = 'This cannot be undone.';
 
   async function mount(inputs: { description?: string; confirmLabel?: string } = {}) {
-    return render(ConfirmationDialogComponent, {
+    return render(ConfirmationDialog, {
       inputs: { title, ...inputs },
       providers: [{ provide: DialogRef, useValue: { close: () => undefined } }],
     });

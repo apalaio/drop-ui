@@ -2,7 +2,6 @@
   {{ element().type }}
 </span>
 
-<!-- Stopping mousedown/touchstart keeps a press on the button from starting a CDK drag of the element. -->
 <button
   type="button"
   class="btn btn-ghost btn-xs btn-square absolute top-1 right-1"
@@ -11,7 +10,15 @@
   (mousedown)="$event.stopPropagation()"
   (touchstart)="$event.stopPropagation()"
 >
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="size-4" aria-hidden="true">
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="2"
+    class="size-4"
+    aria-hidden="true"
+  >
     <path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16" />
   </svg>
 </button>
@@ -22,16 +29,22 @@
       <button type="button" cdkMenuItem (cdkMenuItemTriggered)="editText()">Edit text</button>
     </li>
     <li role="none">
-      <button type="button" class="text-error" cdkMenuItem (cdkMenuItemTriggered)="deleteElement()">Delete element</button>
+      <button type="button" class="text-error" cdkMenuItem (cdkMenuItemTriggered)="deleteElement()">
+        Delete element
+      </button>
     </li>
   </ul>
 </ng-template>
 
 @switch (element().type) {
   @case ('div') {
-    <div class="min-h-16 rounded-field bg-base-200 p-2" data-testid="dropped-div">{{ element().text }}</div>
+    <div class="min-h-16 rounded-field bg-base-200 p-2" data-testid="dropped-div">
+      {{ element().text }}
+    </div>
   }
   @case ('span') {
-    <span class="rounded-field bg-base-200 px-2 py-1" data-testid="dropped-span">{{ element().text }}</span>
+    <span class="rounded-field bg-base-200 px-2 py-1" data-testid="dropped-span">{{
+      element().text
+    }}</span>
   }
 }

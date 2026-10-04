@@ -1,16 +1,16 @@
 import { Dialog, DialogRef } from '@angular/cdk/dialog';
 import { TestBed } from '@angular/core/testing';
 import { Observable, of } from 'rxjs';
-import { ConfirmationDialogComponent, openConfirmationDialog } from './confirmation-dialog';
+import { ConfirmationDialog, openConfirmationDialog } from './confirmation-dialog';
 
-describe('ConfirmationDialogComponent', () => {
+describe('ConfirmationDialog', () => {
   let dialogRef: { close: ReturnType<typeof vi.fn> };
-  let dialog: ConfirmationDialogComponent;
+  let dialog: ConfirmationDialog;
 
   beforeEach(() => {
     dialogRef = { close: vi.fn() };
     TestBed.configureTestingModule({ providers: [{ provide: DialogRef, useValue: dialogRef }] });
-    const fixture = TestBed.createComponent(ConfirmationDialogComponent);
+    const fixture = TestBed.createComponent(ConfirmationDialog);
     fixture.componentRef.setInput('title', 'Delete element');
     dialog = fixture.componentInstance;
   });
@@ -43,7 +43,7 @@ describe('openConfirmationDialog', () => {
     const { open } = openWith(of(undefined));
 
     const [component, config] = open.mock.calls[0] as unknown as [unknown, { ariaLabel: string; bindings: unknown[] }];
-    expect(component).toBe(ConfirmationDialogComponent);
+    expect(component).toBe(ConfirmationDialog);
     expect(config.ariaLabel).toBe('Delete element');
     expect(config.bindings).toHaveLength(3);
   });

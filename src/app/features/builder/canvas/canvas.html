@@ -1,13 +1,26 @@
 <section
-  id="canvas-drop-list"
-  class="canvas-drop-zone flex min-h-full flex-col gap-2 rounded-box border-2 border-dashed border-base-300 bg-base-100 p-6 transition-colors"
+  class="grid min-h-full pt-0.5 pl-0.5"
   aria-label="Canvas"
-  cdkDropList
-  (cdkDropListDropped)="drop($event)"
+  [style.grid-template-rows]="gridTemplateRows()"
+  [style.grid-template-columns]="gridTemplateColumns()"
 >
-  @for (element of store.canvasElements(); track element.uid) {
-    <dui-dropped-element cdkDrag [cdkDragData]="element" [element]="element" />
-  } @empty {
-    <p class="m-auto text-sm text-base-content/50">Drop elements here</p>
+  @for (cell of store.cells(); track cell.row + ':' + cell.column) {
+    <div
+      class="canvas-drop-zone -mt-0.5 -ml-0.5 flex min-h-24 flex-col gap-2 border-2 border-dashed border-base-300 bg-base-100 p-6 transition-colors"
+      role="group"
+      data-testid="canvas-cell"
+      [attr.aria-label]="'Row ' + (cell.row + 1) + ', column ' + (cell.column + 1)"
+      [attr.data-row]="cell.row"
+      [attr.data-column]="cell.column"
+      cdkDropList
+      [cdkDropListData]="cell"
+      (cdkDropListDropped)="drop($event)"
+    >
+      @for (element of cell.elements; track element.uid) {
+        <dui-dropped-element cdkDrag [cdkDragData]="element" [element]="element" />
+      } @empty {
+        <p class="m-auto text-sm text-base-content/50">Drop elements here</p>
+      }
+    </div>
   }
 </section>

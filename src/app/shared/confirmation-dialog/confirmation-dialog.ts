@@ -10,7 +10,7 @@ export const DEFAULT_CONFIRM_LABEL = 'Confirm';
   templateUrl: './confirmation-dialog.html',
   host: { class: 'block w-[min(28rem,90vw)] rounded-box bg-base-100 p-6 shadow-xl' },
 })
-export class ConfirmationDialogComponent {
+export class ConfirmationDialog {
   readonly title = input.required<string>();
   readonly description = input('');
   readonly confirmLabel = input(DEFAULT_CONFIRM_LABEL);
@@ -37,7 +37,7 @@ export function openConfirmationDialog(
   { title, description = '', confirmLabel = DEFAULT_CONFIRM_LABEL }: ConfirmationDialogOptions,
 ): Observable<boolean> {
   return dialog
-    .open<true>(ConfirmationDialogComponent, {
+    .open<true>(ConfirmationDialog, {
       ariaLabel: title,
       bindings: [
         inputBinding('title', () => title),

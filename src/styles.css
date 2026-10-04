@@ -1,7 +1,9 @@
 @import 'tailwindcss';
 /* Positioning and backdrops for CDK overlays: the element actions menu and dialogs. */
 @import '@angular/cdk/overlay-prebuilt.css';
-@plugin "daisyui";
+@plugin "daisyui" {
+  themes: fantasy --default;
+}
 
 /* Angular CDK drag & drop feedback. Global because the drag preview is appended to <body>. */
 .cdk-drag-preview {
@@ -25,6 +27,7 @@
   @apply border-primary/50;
 }
 
+/* Canvas cells overlap their neighbours' borders, so the hovered one is lifted to show its whole outline. */
 .canvas-drop-zone.cdk-drop-list-dragging {
-  @apply border-primary bg-primary/5;
+  @apply z-10 border-primary bg-primary/5;
 }

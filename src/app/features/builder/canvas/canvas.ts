@@ -1,9 +1,12 @@
 import { CdkDrag, CdkDragDrop, CdkDropList } from '@angular/cdk/drag-drop';
-import { Component, inject } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 import { DroppedElement } from '../dropped-element/dropped-element';
 import { CanvasElement } from '../models/canvas-element';
+import { GridCell } from '../models/grid-layout';
 import { PaletteItem } from '../models/palette-item';
 import { BuilderStore } from '../state/builder-store';
+
+const equalTracks = (count: number): string => `repeat(${count}, minmax(0, 1fr))`;
 
 @Component({
   selector: 'dui-canvas',
@@ -14,11 +17,16 @@ import { BuilderStore } from '../state/builder-store';
 export class Canvas {
   protected readonly store = inject(BuilderStore);
 
-  protected drop(event: CdkDragDrop<unknown, unknown, PaletteItem | CanvasElement>): void {
-    if (event.previousContainer === event.container) {
-      this.store.moveElement(event.previousIndex, event.currentIndex);
+  protected readonly gridTemplateRows = computed(() => equalTracks(this.store.grid().rows));
+  protected readonly gridTemplateColumns = computed(() => equalTracks(this.store.grid().columns));
+
+  protected drop(event: CdkDragDrop<GridCell, unknown, PaletteItem | CanvasElement>): void {
+    const { row, column } = event.container.data;
+    const item = event.item.data;
+    if ('paletteUid' in item) {
+      this.store.moveElement(item.uid, { row, column }, event.currentIndex);
     } else {
-      this.store.addElement(event.item.data as PaletteItem, event.currentIndex);
+      this.store.addElement(item, { row, column }, event.currentIndex);
     }
   }
 }

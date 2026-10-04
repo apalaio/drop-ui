@@ -9,7 +9,7 @@ import { Observable } from 'rxjs';
   templateUrl: './text-input-dialog.html',
   host: { class: 'block w-[min(28rem,90vw)] rounded-box bg-base-100 p-6 shadow-xl' },
 })
-export class TextInputDialogComponent {
+export class TextInputDialog {
   readonly title = input.required<string>();
   readonly description = input('');
   readonly value = input('');
@@ -38,7 +38,7 @@ export function openTextInputDialog(
   dialog: Dialog,
   { title, description = '', value = '' }: TextInputDialogOptions,
 ): Observable<string | undefined> {
-  return dialog.open<string>(TextInputDialogComponent, {
+  return dialog.open<string>(TextInputDialog, {
     ariaLabel: title,
     bindings: [
       inputBinding('title', () => title),

@@ -1,16 +1,16 @@
 import { Dialog, DialogRef } from '@angular/cdk/dialog';
 import { TestBed } from '@angular/core/testing';
 import { submit } from '@angular/forms/signals';
-import { openTextInputDialog, TextInputDialogComponent } from './text-input-dialog';
+import { openTextInputDialog, TextInputDialog } from './text-input-dialog';
 
-describe('TextInputDialogComponent', () => {
+describe('TextInputDialog', () => {
   let dialogRef: { close: ReturnType<typeof vi.fn> };
-  let dialog: TextInputDialogComponent;
+  let dialog: TextInputDialog;
 
   beforeEach(() => {
     dialogRef = { close: vi.fn() };
     TestBed.configureTestingModule({ providers: [{ provide: DialogRef, useValue: dialogRef }] });
-    const fixture = TestBed.createComponent(TextInputDialogComponent);
+    const fixture = TestBed.createComponent(TextInputDialog);
     fixture.componentRef.setInput('title', 'Edit text');
     fixture.componentRef.setInput('value', 'enter text');
     dialog = fixture.componentInstance;
@@ -47,7 +47,7 @@ describe('openTextInputDialog', () => {
     openTextInputDialog(dialog, { title: 'Edit text', description: 'Change it.', value: 'enter text' });
 
     const [component, config] = open.mock.calls[0];
-    expect(component).toBe(TextInputDialogComponent);
+    expect(component).toBe(TextInputDialog);
     expect(config?.ariaLabel).toBe('Edit text');
     expect(config?.bindings).toHaveLength(3);
     dialog.closeAll();

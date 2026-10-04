@@ -1,0 +1,495 @@
+# Plan: Supabase persistence + public hosting for DropUI
+
+> This plan only covers what to build. **Never run `git commit`.** The user handles commits and pushes. A task is done only when `npm test -- --watch=false`, `npm run test:components -- --watch=false` and `npm run e2e` all pass.
+
+---
+
+## 1. Context and goals
+
+DropUI keeps all of its state in memory, in `src/app/features/builder/state/builder-store.ts` (`BuilderStore`: `paletteItems`, `canvasElements`, `addElement`, `updateText`, `removeElement`, `moveElement`). A reload wipes the canvas. The goals:
+
+1. **Persist each visitor's canvas** with no signup, using a free backend (Supabase free tier).
+2. **Host the app publicly** so it can be demoed to employers.
+3. **Use one backend for every framework port** (React, Vue, Svelte, ...). Each port is a separate project with separate hosting. The backend contract (schema, RLS, JSON shape, call sequence) is framework-agnostic and documented in the repo.
+4. **Hide Supabase behind a thin `LayoutRepository` abstraction** (DI token). The store and components never import `@supabase/supabase-js`.
+5. **No test touches a live Supabase project.**
+
+### Scope decision: one autosaved layout per visitor
+- Each visitor gets **one autosaved layout**. In the database this is one row in `layouts` with `name = 'default'`. It is loaded on startup and saved automatically after a short debounce (500 ms). There is no save button.
+- The schema already supports a **named layouts list** later: `name` column, `unique (owner, name)`, `id` primary key. That extension would add a layout picker plus `/layouts/:id` routing. It needs no schema change.
+
+### Identity
+- Supabase **anonymous sign-ins**. The first visit calls `signInAnonymously()`. supabase-js keeps the session in `localStorage`, so the same browser keeps the same user and the same data.
+- Anonymous users get the Postgres role `authenticated` (plus an `is_anonymous` JWT claim). RLS uses `owner = auth.uid()`.
+
+---
+
+## 2. Supabase project setup
+
+### 2.1 Dashboard steps (one-time, manual)
+1. Create a project at supabase.com (Free plan). Choose a region close to the expected audience (e.g. `eu-central-1`) and a strong DB password (saved in a password manager, never in the repo).
+2. **Authentication → Sign In / Providers → "Allow anonymous sign-ins": ON.** "Confirm email" does not matter here.
+3. **Authentication → Rate Limits:** keep the default anonymous sign-in limit (30 per hour per IP). That is plenty for demos.
+4. **Authentication → Attack Protection (CAPTCHA): leave OFF for now.** Turning it on makes `signInAnonymously` require a `captchaToken`, and every port would have to embed a Turnstile/hCaptcha widget. Do it later if abuse shows up (see Risks).
+5. **Project Settings → API Keys:** copy the **Project URL** and the **publishable key** (`sb_publishable_...`). The legacy `anon` JWT also works with supabase-js v2. **Never** use or commit the `service_role` / secret key.
+6. **Project Settings → Data API:** make sure the `public` schema is exposed. The migration grants table privileges explicitly, so the "automatically expose new tables" setting does not matter.
+7. **Authentication → URL Configuration:** set Site URL to the production frontend URL (e.g. `https://drop-ui.pages.dev`) once it exists. Anonymous sign-in uses no redirects, so this only matters for a later email/OAuth upgrade. **There is no CORS allow-list to configure.** Supabase's REST and Auth APIs accept any origin, which is why every port can share the project.
+
+### 2.2 Migrations in the repo (Supabase CLI)
+- Run `npx supabase init`. It creates `supabase/config.toml`; commit that file. In it, set `[auth] enable_anonymous_sign_ins = true` so a local stack (`npx supabase start`, needs Docker) behaves like production.
+- Run `npx supabase login`, then `npx supabase link --project-ref <ref>`, then `npx supabase db push`. The fallback is to paste each file into the dashboard **SQL Editor** in order.
+- The CLI is not added to `package.json`. `npx supabase` is enough.
+
+**`supabase/migrations/20261001000000_create_layouts.sql`**
+```sql
+-- One row per (owner, name). v1 clients use exactly one row per owner: name = 'default'.
+create table public.layouts (
+  id          uuid        primary key default gen_random_uuid(),
+  owner       uuid        not null default auth.uid() references auth.users (id) on delete cascade,
+  name        text        not null default 'default' check (char_length(name) between 1 and 100),
+  data        jsonb       not null default '{"version":1,"elements":[]}'::jsonb,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now(),
+  constraint layouts_owner_name_key unique (owner, name),
+  constraint layouts_data_shape check (
+    jsonb_typeof(data) = 'object'
+    and jsonb_typeof(data -> 'version') = 'number'
+    and jsonb_typeof(data -> 'elements') = 'array'
+  ),
+  constraint layouts_data_size check (octet_length(data::text) <= 65536)
+);
+
+comment on table public.layouts is 'DropUI layouts. Contract: docs/backend-contract.md';
+
+-- updated_at maintenance (also fires on upsert's ON CONFLICT DO UPDATE)
+create or replace function public.set_updated_at()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+create trigger layouts_set_updated_at
+before update on public.layouts
+for each row execute function public.set_updated_at();
+
+-- Privileges: only signed-in (incl. anonymous) users; never the bare anon role
+revoke all on table public.layouts from anon;
+grant select, insert, update, delete on table public.layouts to authenticated;
+
+-- Row Level Security: every row is private to its owner
+alter table public.layouts enable row level security;
+
+create policy layouts_select_own on public.layouts
+  for select to authenticated using ((select auth.uid()) = owner);
+
+create policy layouts_insert_own on public.layouts
+  for insert to authenticated with check ((select auth.uid()) = owner);
+
+create policy layouts_update_own on public.layouts
+  for update to authenticated
+  using ((select auth.uid()) = owner)
+  with check ((select auth.uid()) = owner);
+
+create policy layouts_delete_own on public.layouts
+  for delete to authenticated using ((select auth.uid()) = owner);
+```
+The `unique (owner, name)` constraint is both the upsert conflict target and the index for owner lookups. `(select auth.uid())` is the Supabase-recommended form because Postgres evaluates it once per query.
+
+**`supabase/migrations/20261001000100_keepalive.sql`** (target for the keep-alive workflow in §6.3)
+```sql
+create or replace function public.keepalive()
+returns timestamptz
+language sql
+stable
+set search_path = ''
+as $$ select now() $$;
+
+revoke execute on function public.keepalive() from public;
+grant execute on function public.keepalive() to anon, authenticated;
+```
+
+**Optional: `supabase/migrations/20261001000200_purge_stale_anonymous_users.sql`**. Without it, anonymous users accumulate. Deleting a user cascades to that user's layouts.
+```sql
+create extension if not exists pg_cron;
+
+select cron.schedule(
+  'purge-stale-anonymous-users',
+  '0 3 * * *',
+  $$
+    delete from auth.users u
+    where u.is_anonymous
+      and u.created_at < now() - interval '30 days'
+      and not exists (
+        select 1 from public.layouts l
+        where l.owner = u.id and l.updated_at > now() - interval '30 days'
+      )
+  $$
+);
+```
+
+---
+
+## 3. Backend contract (shared with all framework ports)
+
+Create **`docs/backend-contract.md`**. It is the single source of truth that future React/Vue/Svelte repos link to or copy. Contents:
+
+### 3.1 Connection
+- `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`. Both are public by design: they ship in the browser bundle, and RLS is what protects the data.
+- All ports use the same project. Each port is hosted on its own origin, so each has its own `localStorage` and therefore its own anonymous user. **Data is not shared between ports** (expected and fine for demos).
+
+### 3.2 Session sequence (every client)
+1. `auth.getSession()`. If a session exists, use `session.user.id` as `owner`.
+2. Otherwise call `auth.signInAnonymously()` (raw HTTP: `POST {URL}/auth/v1/signup` with header `apikey` and body `{}`). **Do this at most once concurrently**: memoize the promise, or two anonymous users get created.
+3. Let supabase-js persist and refresh the session (`persistSession: true`, `autoRefreshToken: true`).
+
+### 3.3 Operations
+| Operation | supabase-js | Raw PostgREST |
+|---|---|---|
+| Load | `from('layouts').select('data').eq('owner', uid).eq('name','default').maybeSingle()` | `GET /rest/v1/layouts?select=data&name=eq.default` with `apikey` and `Authorization: Bearer <access_token>` |
+| Save | `from('layouts').upsert({ owner: uid, name: 'default', data }, { onConflict: 'owner,name' })` | `POST /rest/v1/layouts?on_conflict=owner,name` with `Prefer: resolution=merge-duplicates` |
+
+- No row means an empty layout `{ "version": 1, "elements": [] }`. Do not write until the user changes something.
+- Save timing: debounce about 500 ms after the last change. Saves run **sequentially** (never two in flight), and the last write wins.
+- Do not autosave after a failed load. Doing so would overwrite good server data with an empty canvas.
+
+### 3.4 `data` JSON, version 1
+```json
+{
+  "version": 1,
+  "elements": [
+    { "id": "6f1c2a9e-7d1b-4c1e-9a43-0b6f0d7e2c11", "type": "div",  "text": "Hello" },
+    { "id": "b0e7...",                              "type": "span", "text": "enter text" }
+  ]
+}
+```
+Rules:
+- `version`: integer. Bump it **only for breaking changes**. A reader that sees a `version` it does not support must show a load error and **must not save over it**.
+- `elements`: in render order, top to bottom.
+- `id`: unique string (UUID v4) per element instance.
+- `type`: one of `"div" | "span"`. Adding a type is not breaking. Readers skip unknown types, which is safe today because rows are never shared across ports.
+- `text`: plain text, never HTML. Render it as text.
+- Writers write only the fields above. Readers ignore unknown fields.
+- **Palette/UI identifiers are not persisted.** Clients derive them from `type`.
+- Server-side limits: `data` is at most 64 KB; `version` must be a number and `elements` an array.
+
+Add a matching TypeScript type and, optionally, `docs/layout-data.schema.json` (JSON Schema draft 2020-12) so ports can validate.
+
+---
+
+## 4. Angular implementation
+
+### 4.1 Dependencies
+- `npm install @supabase/supabase-js` (latest 2.x).
+
+### 4.2 Fix `paletteUid` stability
+Today `createInitialState()` in `builder-store.ts` gives palette items `crypto.randomUUID()`, and `addElement` copies that into `CanvasElement.paletteUid`. A persisted `paletteUid` would therefore dangle after a reload. Fix:
+- In `src/app/features/builder/models/palette-item.ts`, add:
+  ```ts
+  export const ELEMENT_TYPES = ['div', 'span'] as const;
+  export type ElementType = (typeof ELEMENT_TYPES)[number];
+  /** Palette uids are deterministic, so they are stable across reloads and derivable from the element type. */
+  export const paletteUidFor = (type: ElementType): string => `palette-${type}`;
+  ```
+- In `createInitialState()`, set `uid: paletteUidFor('div')` and `uid: paletteUidFor('span')`.
+- **`paletteUid` is not persisted** (it is not in the contract). When loading, derive `paletteUid = paletteUidFor(type)`. `CanvasElement` keeps the field, so no component changes are needed. Existing test fixtures already use `'palette-div'` / `'palette-span'`.
+
+### 4.3 New files: persistence layer (`src/app/features/builder/persistence/`)
+
+| File | Purpose |
+|---|---|
+| `layout-data.ts` | Contract types: `LAYOUT_DATA_VERSION = 1`, `LayoutData { version: number; elements: LayoutElementData[] }`, `LayoutElementData { id; type; text }`. Mappers: `toLayoutData(elements: CanvasElement[]): LayoutData` (`uid` becomes `id`, `paletteUid` is dropped) and `fromLayoutData(data: unknown): CanvasElement[]`. `fromLayoutData` validates shape, throws `UnsupportedLayoutVersionError` when `version !== 1`, skips unknown `type`s with `console.warn`, and derives `paletteUid` via `paletteUidFor`. |
+| `layout-repository.ts` | `interface LayoutRepository { load(): Promise<LayoutData \| null>; save(layout: LayoutData): Promise<void>; }` and `export const LAYOUT_REPOSITORY = new InjectionToken<LayoutRepository>('LayoutRepository')`. The token has **no default factory**: a missing provider should fail loudly. Promises keep the interface framework-agnostic. |
+| `supabase-layout-repository.ts` | `class SupabaseLayoutRepository implements LayoutRepository`. Its constructor takes a `SupabaseClient`, so tests can inject a fake. A private memoized `ensureOwner(): Promise<string>` implements §3.2: `getSession` first, then `signInAnonymously` once, with the cached promise cleared on failure. `load()` and `save()` implement §3.3 with `DEFAULT_LAYOUT_NAME = 'default'` and throw on `error`. This is the **only** file that imports from `@supabase/supabase-js`, apart from the provider. |
+| `local-storage-layout-repository.ts` | `class LocalStorageLayoutRepository` with constructor `(storage: Storage, key = 'drop-ui:layout:default')`. It stores `LayoutData` as JSON; `JSON.parse` errors propagate as load errors. Used by the `e2e` configuration and as an offline/no-backend mode. |
+| `in-memory-layout-repository.ts` | **Test helper.** `class InMemoryLayoutRepository` with `constructor(public stored: LayoutData \| null = null)`, `load` resolving `stored`, `save` setting `stored`. Exports `provideInMemoryLayoutRepository(initial?)`, which returns a `Provider` built with `useValue: new InMemoryLayoutRepository(initial)`. Only spec/test files import it. |
+| `provide-layout-repository.ts` | `provideLayoutRepository(config: PersistenceConfig): EnvironmentProviders`, built with `makeEnvironmentProviders`. For `kind: 'supabase'` it uses `useFactory: () => new SupabaseLayoutRepository(createClient(config.url, config.publishableKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } }))`. For `kind: 'local-storage'` it uses `useFactory: () => new LocalStorageLayoutRepository(localStorage)`. |
+
+### 4.4 Environment config (Angular 22, `@angular/build:application`)
+- `src/environments/environment.model.ts`:
+  ```ts
+  export type PersistenceConfig =
+    | { kind: 'supabase'; url: string; publishableKey: string }
+    | { kind: 'local-storage' };
+  export interface Environment { persistence: PersistenceConfig; }
+  ```
+- `src/environments/environment.ts` (production) and `environment.development.ts` (`ng serve`): both `{ persistence: { kind: 'supabase', url: 'https://<ref>.supabase.co', publishableKey: 'sb_publishable_...' } }`. **These are committed.** The publishable key is public by design and ends up in the bundle either way. That means hosting needs no environment variables, and every port can copy the same two values. The alternative, if you prefer not to commit them, is a `define` option plus a `--define` flag in the host's build command; that adds a build-time variable in every host.
+- `src/environments/environment.e2e.ts`: `{ persistence: { kind: 'local-storage' } }`. Playwright never touches Supabase.
+- `angular.json` → `projects.drop-ui.architect`:
+  - `build.configurations.development` gets `"fileReplacements": [{ "replace": "src/environments/environment.ts", "with": "src/environments/environment.development.ts" }]`.
+  - Add `build.configurations.e2e` with the same settings as `development` (`optimization: false`, `extractLicenses: false`, `sourceMap: true`) plus a file replacement to `environment.e2e.ts`.
+  - Add `serve.configurations.e2e: { "buildTarget": "drop-ui:build:e2e" }`.
+- `src/app/app.config.ts`: add `provideLayoutRepository(environment.persistence)` to `providers` (`import { environment } from '../environments/environment'`).
+
+### 4.5 Store: `withLayoutPersistence()` custom SignalStore feature
+New file **`src/app/features/builder/state/with-layout-persistence.ts`**. All persistence state stays in the SignalStore, with no BehaviorSubjects.
+
+```ts
+export type SyncStatus = 'loading' | 'load-error' | 'idle' | 'saving' | 'save-error';
+export const AUTOSAVE_DEBOUNCE_MS = 500;
+
+export function withLayoutPersistence() {
+  return signalStoreFeature(
+    type<{ state: { canvasElements: CanvasElement[] } }>(),
+    withState({ syncStatus: 'loading' as SyncStatus, syncError: null as string | null }),
+    withProps(() => ({
+      _repository: inject(LAYOUT_REPOSITORY),
+      _pendingTasks: inject(PendingTasks),
+      _injector: inject(Injector),
+    })),
+    withComputed(({ syncStatus }) => ({
+      /** Editing is blocked until the saved layout is in, so a late load can't clobber edits. */
+      isEditable: computed(() => syncStatus() !== 'loading' && syncStatus() !== 'load-error'),
+    })),
+    withMethods((store) => {
+      const persist = (elements: CanvasElement[]) =>
+        from(store._repository.save(toLayoutData(elements))).pipe(
+          tap(() => patchState(store, { syncStatus: 'idle', syncError: null })),
+          catchError((error) => {
+            patchState(store, { syncStatus: 'save-error', syncError: messageOf(error) });
+            return EMPTY;
+          }),
+        );
+      const autosave = rxMethod<CanvasElement[]>(pipe(
+        skip(1),                                   // first emission = the layout just loaded
+        tap(() => patchState(store, { syncStatus: 'saving' })),
+        debounceTime(AUTOSAVE_DEBOUNCE_MS),
+        concatMap(persist),                        // sequential writes, never overlapping
+      ));
+      const saveNow = rxMethod<void>(pipe(
+        tap(() => patchState(store, { syncStatus: 'saving' })),
+        concatMap(() => persist(store.canvasElements())),
+      ));
+      let autosaveStarted = false;
+
+      async function load(): Promise<void> {
+        patchState(store, { syncStatus: 'loading', syncError: null });
+        try {
+          const layout = await store._pendingTasks.run(() => store._repository.load());
+          patchState(store, { canvasElements: layout ? fromLayoutData(layout) : [], syncStatus: 'idle' });
+          if (!autosaveStarted) {
+            autosaveStarted = true;
+            autosave(store.canvasElements, { injector: store._injector });
+          }
+        } catch (error) {
+          patchState(store, { syncStatus: 'load-error', syncError: messageOf(error) }); // autosave stays off
+        }
+      }
+
+      return {
+        load,
+        retry(): void {
+          if (store.syncStatus() === 'load-error') void load();
+          else if (store.syncStatus() === 'save-error') saveNow();
+        },
+      };
+    }),
+    withHooks({ onInit: (store) => void store.load() }),
+  );
+}
+```
+Notes:
+- `messageOf(error)` is a small local helper (`error instanceof Error ? error.message : String(error)`).
+- Members prefixed with `_` are private to the store (NgRx SignalStore convention).
+- Passing `{ injector }` to the rxMethod avoids the "called outside injection context" warning, because `autosave` starts after an `await`.
+- `PendingTasks.run` keeps `ApplicationRef.whenStable()` pending until the load finishes, which gives tests a clean await point.
+- After a `save-error`, the next edit retries automatically through the same pipeline. `retry()` covers the case where the user wants to retry without editing.
+
+**`builder-store.ts` changes:**
+- Use the stable palette uids (§4.2).
+- Append `withLayoutPersistence()` after the existing `withMethods(...)`, i.e. `signalStore({ providedIn: 'root' }, withState(createInitialState), withMethods(...), withLayoutPersistence())`.
+- The public API of the existing four methods does not change.
+
+### 4.6 UI (DaisyUI, accessible)
+1. **New component `src/app/features/builder/save-status/save-status.{ts,html}`**, selector `dui-save-status`. It injects `BuilderStore`. The template is an always-present `<div role="status" aria-live="polite" class="flex items-center gap-2 text-sm">` containing `@switch (store.syncStatus())`:
+   - `loading`: `<span class="loading loading-spinner loading-xs" aria-hidden="true"></span> Loading…`
+   - `saving`: spinner, then `Saving…`
+   - `idle`: `<span class="badge badge-ghost badge-sm">All changes saved</span>`
+   - `load-error`: `<div role="alert" class="alert alert-error alert-soft py-1 px-3">Couldn't load your layout. <button type="button" class="btn btn-xs" (click)="retry()">Retry</button></div>`
+   - `save-error`: the same alert pattern, reading "Changes not saved." with a Retry button.
+
+   `retry()` is a one-line class method calling `store.retry()`, so it is reachable from a spec.
+2. **`builder-shell.html`**: the header becomes `navbar justify-between`, with `<dui-save-status />` next to the "DropUI" title. Add `SaveStatus` to `BuilderShell.imports`.
+3. **`canvas.html`**:
+   - On the `<section>`, add `[cdkDropListDisabled]="!store.isEditable()"` and `[attr.aria-busy]="store.syncStatus() === 'loading'"`.
+   - In `@empty`, branch: `@if (store.syncStatus() === 'loading') { <p class="m-auto flex items-center gap-2 text-sm text-base-content/50"><span class="loading loading-dots loading-sm" aria-hidden="true"></span>Loading layout…</p> } @else { <p ...>Drop elements here</p> }`.
+4. No changes to `dropped-element` or `element-palette`. Dropping onto a disabled canvas is rejected by the CDK.
+
+### 4.7 Optional polish (not required for the demo)
+- A `beforeunload` prompt while `syncStatus() === 'saving'`, registered in `withHooks`.
+- Lazy-loading `@supabase/supabase-js` (dynamic `import()` inside the factory) if `ng build` exceeds the 500 kB initial budget warning.
+
+---
+
+## 5. Testing plan (no live Supabase)
+
+The general approach: unit and component tests provide `provideInMemoryLayoutRepository()` or stub `BuilderStore`. E2E runs the `e2e` serve configuration, which uses localStorage persistence.
+
+### 5.1 Unit tests (`*.spec.ts`, jsdom): `npm test -- --watch=false`
+- **`persistence/layout-data.spec.ts`**
+  - `toLayoutData` maps `uid` to `id` and drops `paletteUid`.
+  - `fromLayoutData` round-trips with derived `paletteUid`.
+  - It skips unknown types.
+  - It throws on an unsupported `version` and on a malformed shape (missing `elements`, non-object).
+- **`persistence/supabase-layout-repository.spec.ts`**: uses a hand-built fake client `{ auth: { getSession: vi.fn(), signInAnonymously: vi.fn() }, from: vi.fn(() => builder) }`, where `builder` has chainable `select/eq/maybeSingle/upsert` `vi.fn()`s.
+  - Reuses an existing session.
+  - Signs in anonymously exactly once when `load()` and `save()` run concurrently.
+  - `load` returns `null` when there is no row and returns `row.data` when there is one.
+  - `save` upserts `{ owner, name: 'default', data }` with `{ onConflict: 'owner,name' }`.
+  - Supabase `error` values reject the promise.
+  - A failed sign-in is retried on the next call.
+- **`persistence/local-storage-layout-repository.spec.ts`**: uses jsdom `localStorage`, cleared in `beforeEach`.
+  - Returns `null` when empty.
+  - `save` then `load` round-trips.
+  - Corrupt JSON rejects.
+- **`state/with-layout-persistence.spec.ts`**: uses a minimal test store, `signalStore(withState({ canvasElements: [] as CanvasElement[] }), withMethods(...simple setter...), withLayoutPersistence())`, provided through `TestBed.configureTestingModule({ providers: [TestStore, { provide: LAYOUT_REPOSITORY, useValue: repo }] })`. Use one `InMemoryLayoutRepository` per test and spy on it with `vi.spyOn(repo, 'save')`. Await the load with `await TestBed.inject(ApplicationRef).whenStable()`. Use `vi.useFakeTimers()` and `TestBed.tick()` to flush the rxMethod's signal effect, then `await vi.advanceTimersByTimeAsync(AUTOSAVE_DEBOUNCE_MS)`. Cases:
+  - Starts in `loading` with `isEditable()` false.
+  - Loads a stored layout into `canvasElements` and moves to `idle`.
+  - Missing layout gives an empty canvas and `idle`.
+  - Makes no save right after load.
+  - Two quick changes produce **one** save containing the latest data, and the status goes `saving` then `idle`.
+  - Load failure gives `load-error` with `syncError` set, **no autosave on later changes**, and `retry()` reloads successfully.
+  - Save failure gives `save-error`; the next change saves and returns to `idle`; `retry()` saves the current state.
+  - An unsupported version gives `load-error`.
+- **`state/builder-store.spec.ts`** (update):
+  - Add a `beforeEach` providing `provideInMemoryLayoutRepository()`.
+  - Add a `createStore()` helper that injects the store and awaits `ApplicationRef.whenStable()`; use it in all existing tests, since mutations need a loaded store.
+  - Add: "palette uids are stable", i.e. `['palette-div', 'palette-span']`.
+  - Add: "restores a saved layout with paletteUid derived from type", seeded through `provideInMemoryLayoutRepository({ version: 1, elements: [...] })`.
+  - Keep the existing "unique uid" palette test; it still holds.
+- **`save-status/save-status.spec.ts`**: in the error state, `retry()` calls `store.retry` (spy on the injected stub, as the testing guide allows in specs).
+
+### 5.2 Component tests (`*.test.ts`, real Chromium): `npm run test:components -- --watch=false`
+- **`save-status/save-status.test.ts`** (new; one `it` per `@case`). The stub is `{ provide: BuilderStore, useValue: { syncStatus: signal(<status>), retry: () => {} } }`.
+  - `loading`: status reads "Loading…".
+  - `saving`: "Saving…".
+  - `idle`: "All changes saved".
+  - `load-error`: an `alert` with "Couldn't load your layout" and a `Retry` button.
+  - `save-error`: an alert with "Changes not saved" and `Retry`.
+  - The non-error cases render no `alert`, checked with `queryByRole('alert')`.
+- **`canvas/canvas.test.ts`** (update; full-file coverage). Extend `mount` to also stub `syncStatus: signal(...)` and `isEditable: signal(...)`. Add a `while loading` describe:
+  - Renders "Loading layout…".
+  - Does not render the drop hint.
+  - The canvas region has `aria-busy="true"`.
+
+  The existing describes use `idle` and assert `aria-busy="false"`. Disabled dragging is behavioural and is covered by E2E.
+- **`builder-shell/builder-shell.test.ts`** and **`app.test.ts`**: add `providers: [provideInMemoryLayoutRepository()]`, since they render the real root `BuilderStore`. In `builder-shell.test.ts`, add one check that the header contains the save status: `getByRole('status')` eventually shows "All changes saved" via `findByText`.
+- `.claude/guides/testing.md`: add a short note that anything rendering or injecting the real `BuilderStore` must provide `provideInMemoryLayoutRepository()`, and how to await the initial load.
+
+### 5.3 E2E (`*.e2e.ts`, Playwright): `npm run e2e`
+- **`playwright.config.ts`**:
+  - `webServer.command: 'npx ng serve --configuration e2e --port 4300'`.
+  - `webServer.url` and `use.baseURL`: `http://localhost:4300`.
+  - The separate port keeps Playwright from reusing a Supabase-backed dev server on 4200.
+  - Each test gets a fresh browser context, so localStorage starts empty.
+- **`e2e/support/builder.ts`** (new, not matched by `*.e2e.ts`):
+  - Move the `drag()` helper here from `drag-drop.e2e.ts`.
+  - Add `openBuilder(page)`, which does `page.goto('/')` and then waits for `getByRole('status')` to have text "All changes saved", so drags only start once the canvas is editable.
+  - Update `drag-drop.e2e.ts` and `app.e2e.ts` to use them.
+- **`e2e/persistence.e2e.ts`** (new):
+  1. **Restores the layout after a reload.** Drop a div, drop a span, edit the div's text to "Hello world". Wait with `page.waitForFunction(() => localStorage.getItem('drop-ui:layout:default')?.includes('Hello world'))`. Then `page.reload()`, run `openBuilder`, and assert the same element types in the same order and the text "Hello world".
+  2. **Shows a load error with retry and keeps the stored data.** Use `page.addInitScript` to seed localStorage with `{"version":99,"elements":[]}`. Assert the `alert` "Couldn't load your layout" and the canvas showing "Drop elements here". Overwrite storage with a valid v1 layout, click `Retry`, and assert the element renders and the status reaches "All changes saved".
+- **Optional:** one Playwright test that mocks Supabase over the network (`page.route('**/auth/v1/signup', ...)` and `'**/rest/v1/layouts**'`) under an extra `e2e-supabase` configuration. It is not needed, because the spec in §5.1 already covers the Supabase request shapes.
+
+### 5.4 Database checks (optional, manual or `npx supabase test db`)
+- A pgTAP test, or the SQL Editor snippet below, proving that user B cannot see user A's row:
+  ```sql
+  begin;
+  set local role authenticated;
+  set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000b","role":"authenticated"}';
+  select count(*) from public.layouts;  -- must not include A's rows
+  rollback;
+  ```
+
+---
+
+## 6. Hosting and deployment
+
+### 6.1 Frontend: Cloudflare Pages (chosen)
+Why Cloudflare Pages: unlimited bandwidth on the free plan, Git-based deploys with per-branch preview URLs, SPA fallback with no configuration, and free Turnstile if CAPTCHA is ever needed. (`.claude/plans/cloudflare` covers the Cloudflare-backend variant; this section is enough on its own.)
+
+1. Cloudflare dashboard → **Workers & Pages → Create → Pages → Connect to Git**, then select the `drop-ui` GitHub repo, production branch `main`.
+2. Build settings:
+   - Framework preset: *None* (or Angular).
+   - **Build command:** `npm run build`.
+   - **Output directory:** `dist/drop-ui/browser`.
+   - **Environment variable:** `NODE_VERSION=24`. Angular 22 requires `^22.22.3 || ^24.15.0`, and the local machine runs v24.19.
+3. SPA fallback: Pages serves `index.html` for unknown paths as long as the output has **no top-level `404.html`**. Do not add one. There are no routes yet, but this keeps future deep links working. No Supabase variables are needed because the environment files are committed (§4.4).
+4. After the first deploy, note the URL (e.g. `https://drop-ui.pages.dev`), then set the Supabase Site URL (§2.1 step 7). Preview deploys (`https://<hash>.drop-ui.pages.dev`) use the same backend, which is acceptable.
+5. Each later framework port gets its own Pages project (e.g. `drop-ui-react.pages.dev`) pointing at the same Supabase URL and key, following `docs/backend-contract.md`.
+
+Alternative: Cloudflare Workers static assets, with a `wrangler.jsonc` containing `"assets": { "directory": "./dist/drop-ui/browser", "not_found_handling": "single-page-application" }`.
+
+### 6.2 Database deploy
+- `npx supabase db push` (or the SQL Editor) whenever a new migration file is added. Migrations are append-only; never edit one that has already been applied.
+
+### 6.3 Keep-alive (free projects pause after about 7 days of inactivity)
+New file **`.github/workflows/supabase-keepalive.yml`**:
+```yaml
+name: Supabase keep-alive
+on:
+  schedule:
+    - cron: '17 6 */3 * *'   # every ~3 days (max gap 4 days)
+  workflow_dispatch:
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call keepalive RPC (runs a real DB query)
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          curl --fail --silent --show-error -X POST "$SUPABASE_URL/rest/v1/rpc/keepalive" \
+            -H "apikey: $SUPABASE_PUBLISHABLE_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{}'
+```
+- Add repo **variable** `SUPABASE_URL` and repo **secret** `SUPABASE_PUBLISHABLE_KEY` (GitHub → Settings → Secrets and variables → Actions).
+- Only send the `apikey` header. A `sb_publishable_` key is not a JWT, so it must not be sent as `Authorization: Bearer`.
+- Scheduled workflows run only from the default branch. GitHub disables them after 60 days without repository activity, so re-enable from the Actions tab if that happens.
+- This workflow is needed in **one** repo only, not in every port.
+
+---
+
+## 7. End-to-end verification
+1. `npm test -- --watch=false`, `npm run test:components -- --watch=false` and `npm run e2e` are all green.
+2. `npm run build` succeeds within budgets. If the initial bundle warns because of supabase-js, apply §4.7 lazy loading.
+3. **Local run against the real project** (`npm start`, development environment):
+   - The status shows "Loading…", then "All changes saved".
+   - Dropping, editing, reordering and deleting show "Saving…", then "All changes saved".
+   - After a reload, the layout is identical.
+   - The Supabase **Table Editor** shows one `layouts` row with v1 `data` and an advancing `updated_at`.
+   - **Authentication → Users** shows one anonymous user.
+4. **Isolation:**
+   - An incognito window starts with an empty canvas (new anonymous user, second row).
+   - The RLS SQL snippet in §5.4 returns only the impersonated user's rows.
+   - `curl "$URL/rest/v1/layouts?select=*" -H "apikey: $KEY"` with no user token returns an error or an empty result, never data.
+5. **Failure UX:** with DevTools set to offline (or the Supabase URL blocked) before load, the page shows "Couldn't load your layout" with Retry, and the canvas does not accept drops. Re-enable the network and click Retry; the layout loads. Going offline after load and then editing shows "Changes not saved"; reconnecting and clicking Retry gives "All changes saved".
+6. **Deployed:** the production Pages URL repeats steps 3 to 5, and a hard refresh on a deep path (e.g. `/foo`) still serves the app.
+7. **Keep-alive:** trigger the workflow manually (`workflow_dispatch`); it returns 200 with a timestamp body.
+
+---
+
+## 8. Risks and open questions
+- **Anonymous data is tied to browser storage.** Clearing site data or switching device means a new, empty layout, and the old row is orphaned (the optional pg_cron purge cleans these up). A later upgrade path is `supabase.auth.updateUser({ email })` or `linkIdentity()` to convert an anonymous user into a permanent one. That would require Site URL and redirect URLs to be set (§2.1 step 7).
+- **Abuse:** anonymous sign-ups can be scripted. Mitigations: the default IP rate limit, the 64 KB `data` check, the stale-user purge, and Cloudflare Turnstile CAPTCHA if needed (every port would then need to send `captchaToken`). Free tier allows 500 MB of database and 50k MAU, which is plenty for a demo.
+- **Pausing:** keeping a project awake with periodic RPC calls is common practice but not officially guaranteed. If the project does pause, restore it from the dashboard. Projects paused for more than 90 days may become non-restorable, so keep the workflow healthy.
+- **Concurrent tabs:** last write wins, and there is no realtime sync. A future option is optimistic concurrency on `updated_at`, or Supabase Realtime.
+- **Committing the publishable key** is intended (it is public). Confirm you are comfortable with this; otherwise use the build-time `--define` alternative from §4.4.
+- **supabase-js and Navigator LockManager:** supabase-js uses `navigator.locks` for session refresh. Lock timeout errors historically affected zone.js apps; this app is zoneless, so the risk is low. If it shows up, pass a custom `auth.lock`.
+- **Unknown element types** are skipped on read and would be dropped on the next save. This is safe only while ports do not share rows. Revisit if accounts become shared across ports.
+- **Open:** keep `syncStatus` names as defined here, or align them with a future multi-layout UI (`dirty`, for example)? Should development point at the production Supabase project (as planned) or at a local `npx supabase start` stack?
+
+---
+
+### Critical files for implementation
+- `src/app/features/builder/state/builder-store.ts` (stable palette uids; compose `withLayoutPersistence()`)
+- `src/app/features/builder/state/with-layout-persistence.ts` (new: load, debounced autosave, status)
+- `src/app/features/builder/persistence/supabase-layout-repository.ts` (new, together with `layout-repository.ts`, `layout-data.ts`, `local-storage-layout-repository.ts`, `in-memory-layout-repository.ts`, `provide-layout-repository.ts`)
+- `supabase/migrations/20261001000000_create_layouts.sql` (new: table, trigger, grants, RLS) and `docs/backend-contract.md` (new: shared contract)
+- `src/app/app.config.ts`, `angular.json`, `playwright.config.ts` (DI wiring, environment file replacements, `e2e` serve configuration on port 4300)

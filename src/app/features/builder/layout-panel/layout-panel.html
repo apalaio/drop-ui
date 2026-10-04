@@ -1,0 +1,33 @@
+<h2 class="mb-2 text-xs font-semibold tracking-wide text-base-content/60 uppercase">Layout</h2>
+
+<ul class="flex w-full flex-col gap-1">
+  <li class="flex items-center justify-between gap-2 rounded-field border border-base-300 bg-base-100 px-3 py-1.5 text-sm">
+    <span>Grid</span>
+    <!-- The × is generated content, so the entry's text stays just "Grid". -->
+    <span class="flex items-center gap-1 text-xs text-base-content/50">
+      <input
+        #rows
+        type="number"
+        class="input input-xs w-12 text-base-content"
+        aria-label="Grid rows"
+        [min]="minSize"
+        [max]="maxSize"
+        [value]="store.grid().rows"
+        (change)="commit('rows', rows)"
+        (blur)="show('rows', rows)"
+      />
+      <span class="before:content-['×']" aria-hidden="true"></span>
+      <input
+        #columns
+        type="number"
+        class="input input-xs w-12 text-base-content"
+        aria-label="Grid columns"
+        [min]="minSize"
+        [max]="maxSize"
+        [value]="store.grid().columns"
+        (change)="commit('columns', columns)"
+        (blur)="show('columns', columns)"
+      />
+    </span>
+  </li>
+</ul>

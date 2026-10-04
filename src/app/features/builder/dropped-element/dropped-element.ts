@@ -7,13 +7,11 @@ import { CanvasElement } from '../models/canvas-element';
 import { ElementType } from '../models/palette-item';
 import { BuilderStore } from '../state/builder-store';
 
-/** Hover outline per element type, so element kinds are distinguishable on the canvas. */
 const HOVER_OUTLINE: Record<ElementType, string> = {
   div: 'border-dashed hover:border-primary/40',
   span: 'border-dotted hover:border-secondary',
 };
 
-/** Builder chrome around a single dropped element; renders the real element inside. */
 @Component({
   selector: 'dui-dropped-element',
   imports: [CdkMenuTrigger, CdkMenu, CdkMenuItem],
