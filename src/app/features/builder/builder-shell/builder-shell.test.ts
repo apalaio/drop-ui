@@ -4,6 +4,12 @@ import { BuilderShell } from './builder-shell';
 describe(BuilderShell.name, () => {
   beforeEach(async () => render(BuilderShell));
 
+  it('should place the theme picker in the header', () => {
+    const header = screen.getByRole('banner');
+
+    expect(within(header).getByRole('button', { name: 'Change theme' })).toBeInTheDocument();
+  });
+
   it('should place the palette in the sidebar', () => {
     const sidebar = screen.getByRole('complementary', { name: 'Sidebar' });
 

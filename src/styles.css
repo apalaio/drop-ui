@@ -1,8 +1,12 @@
 @import 'tailwindcss';
 /* Positioning and backdrops for CDK overlays: the element actions menu and dialogs. */
 @import '@angular/cdk/overlay-prebuilt.css';
+/*
+ * `all` builds every built-in theme for the header's theme picker, but hardcodes `light` as the
+ * fallback; the app starts in `fantasy` through `data-theme` on <html>, which ThemeStore keeps in sync.
+ */
 @plugin "daisyui" {
-  themes: fantasy --default;
+  themes: all;
 }
 
 /* Angular CDK drag & drop feedback. Global because the drag preview is appended to <body>. */
