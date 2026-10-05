@@ -1,4 +1,4 @@
-import { DropdownOption } from '../../../shared/dropdown-options-dialog/dropdown-option';
+import { DropdownOption } from './dropdown-option';
 import { ElementType } from './palette-item';
 
 /** An element instance placed on the canvas. Its position among the elements of its cell is its order in that cell. */
@@ -12,16 +12,29 @@ interface BaseCanvasElement<T extends ElementType> {
   column: number;
 }
 
-export interface TextCanvasElement extends BaseCanvasElement<
-  'div' | 'span' | 'text-input' | 'textfield'
-> {
+export interface TextCanvasElement extends BaseCanvasElement<'div' | 'span'> {
   text: string;
 }
 
-export interface DatepickerCanvasElement extends BaseCanvasElement<'datepicker'> {}
+/** `text` is the placeholder; `value` is what the user typed. */
+export interface TextControlCanvasElement extends BaseCanvasElement<'text-input' | 'textfield'> {
+  text: string;
+  value: string;
+}
+
+export interface DatepickerCanvasElement extends BaseCanvasElement<'datepicker'> {
+  /** `yyyy-mm-dd`, or empty when no date is picked. */
+  value: string;
+}
 
 export interface DropdownCanvasElement extends BaseCanvasElement<'dropdown'> {
   options: DropdownOption[];
+  /** Value of the selected option; empty only while there are no options. */
+  value: string;
 }
 
-export type CanvasElement = TextCanvasElement | DatepickerCanvasElement | DropdownCanvasElement;
+export type CanvasElement =
+  | TextCanvasElement
+  | TextControlCanvasElement
+  | DatepickerCanvasElement
+  | DropdownCanvasElement;

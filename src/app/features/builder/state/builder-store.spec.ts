@@ -7,6 +7,7 @@ type Store = InstanceType<typeof BuilderStore>;
 
 describe('BuilderStore', () => {
   const origin = { row: 0, column: 0 };
+  const controlTypes = ['text-input', 'textfield', 'datepicker', 'dropdown'] as const;
 
   function uidsIn(store: Store, row: number, column: number): string[] {
     const cell = store.cells().find((candidate) => candidate.row === row && candidate.column === column);
@@ -257,6 +258,22 @@ describe('BuilderStore', () => {
       expect(store.canvasElements()[0]).not.toHaveProperty('options');
     });
 
+    it.each(['div', 'span'] as const)('starts a %s without a value', (type) => {
+      const store = TestBed.inject(BuilderStore);
+
+      addOfType(store, type);
+
+      expect(store.canvasElements()[0]).not.toHaveProperty('value');
+    });
+
+    it.each(controlTypes)('starts a %s with an empty value', (type) => {
+      const store = TestBed.inject(BuilderStore);
+
+      addOfType(store, type);
+
+      expect(store.canvasElements()[0]).toMatchObject({ type, value: '' });
+    });
+
     it('starts a datepicker with neither text nor options', () => {
       const store = TestBed.inject(BuilderStore);
 
@@ -374,6 +391,130 @@ describe('BuilderStore', () => {
       store.moveElement(uid, { row: 0, column: 1 }, 0);
 
       expect(store.canvasElements()).toEqual([expect.objectContaining({ uid, options, row: 0, column: 1 })]);
+    });
+
+    it('selects the first option when options are first saved', () => {
+      const store = TestBed.inject(BuilderStore);
+      const uid = addOfType(store, 'dropdown');
+
+      store.updateOptions(uid, options);
+
+      expect(store.canvasElements()[0]).toMatchObject({ value: 's' });
+    });
+
+    it('keeps the selected option when it is still among the saved options', () => {
+      const store = TestBed.inject(BuilderStore);
+      const uid = addOfType(store, 'dropdown');
+      store.updateOptions(uid, options);
+      store.updateValue(uid, 'l');
+
+      store.updateOptions(uid, [{ text: 'Medium', value: 'm' }, options[1]]);
+
+      expect(store.canvasElements()[0]).toMatchObject({ value: 'l' });
+    });
+
+    it('selects the first option when the selected one is no longer among the saved options', () => {
+      const store = TestBed.inject(BuilderStore);
+      const uid = addOfType(store, 'dropdown');
+      store.updateOptions(uid, options);
+      store.updateValue(uid, 'l');
+
+      store.updateOptions(uid, [{ text: 'Medium', value: 'm' }, options[0]]);
+
+      expect(store.canvasElements()[0]).toMatchObject({ value: 'm' });
+    });
+
+    it('clears the selection when no option is left', () => {
+      const store = TestBed.inject(BuilderStore);
+      const uid = addOfType(store, 'dropdown');
+      store.updateOptions(uid, options);
+
+      store.updateOptions(uid, []);
+
+      expect(store.canvasElements()[0]).toMatchObject({ value: '' });
+    });
+  });
+
+  describe('updateValue', () => {
+    const options = [
+      { text: 'Small', value: 's' },
+      { text: 'Large', value: 'l' },
+    ];
+
+    it.each([
+      { type: 'text-input', value: 'Ada' },
+      { type: 'textfield', value: 'Two\nlines' },
+      { type: 'datepicker', value: '2026-10-05' },
+    ] as const)('changes the value of the matching $type only', ({ type, value }) => {
+      const store = TestBed.inject(BuilderStore);
+      const [first, second] = [addOfType(store, type), addOfType(store, type)];
+
+      store.updateValue(second, value);
+
+      expect(store.canvasElements()).toEqual([
+        expect.objectContaining({ uid: first, value: '' }),
+        expect.objectContaining({ uid: second, value }),
+      ]);
+    });
+
+    it('selects an option of the matching dropdown only', () => {
+      const store = TestBed.inject(BuilderStore);
+      const [first, second] = [addOfType(store, 'dropdown'), addOfType(store, 'dropdown')];
+      store.updateOptions(first, options);
+      store.updateOptions(second, options);
+
+      store.updateValue(second, 'l');
+
+      expect(store.canvasElements()).toEqual([
+        expect.objectContaining({ uid: first, value: 's' }),
+        expect.objectContaining({ uid: second, value: 'l' }),
+      ]);
+    });
+
+    it('leaves a dropdown as it was for a value none of its options has', () => {
+      const store = TestBed.inject(BuilderStore);
+      const uid = addOfType(store, 'dropdown');
+      store.updateOptions(uid, options);
+      const before = store.canvasElements();
+
+      store.updateValue(uid, 'xl');
+
+      expect(store.canvasElements()).toEqual(before);
+    });
+
+    it.each(['div', 'span'] as const)('leaves a %s, which has no value, as it was', (type) => {
+      const store = TestBed.inject(BuilderStore);
+      const uid = addOfType(store, type);
+      const before = store.canvasElements();
+
+      store.updateValue(uid, 'Ada');
+
+      expect(store.canvasElements()).toEqual(before);
+    });
+
+    it('keeps the value of a control moved to another cell', () => {
+      const store = TestBed.inject(BuilderStore);
+      store.setGridSize('columns', 2);
+      const uid = addOfType(store, 'text-input');
+      store.updateValue(uid, 'Ada');
+
+      store.moveElement(uid, { row: 0, column: 1 }, 0);
+
+      expect(store.canvasElements()).toEqual([expect.objectContaining({ uid, value: 'Ada', row: 0, column: 1 })]);
+    });
+
+    it('keeps the value of a control whose cell is removed when the grid shrinks', () => {
+      const store = TestBed.inject(BuilderStore);
+      store.setGridSize('columns', 2);
+      const uid = addOfType(store, 'datepicker');
+      store.moveElement(uid, { row: 0, column: 1 }, 0);
+      store.updateValue(uid, '2026-10-05');
+
+      store.setGridSize('columns', 1);
+
+      expect(store.canvasElements()).toEqual([
+        expect.objectContaining({ uid, value: '2026-10-05', row: 0, column: 0 }),
+      ]);
     });
   });
 

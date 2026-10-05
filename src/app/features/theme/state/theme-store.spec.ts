@@ -1,60 +1,144 @@
 import { TestBed } from '@angular/core/testing';
 import themeOrder from 'daisyui/functions/themeOrder';
-import { DEFAULT_THEME, THEMES, ThemeStore } from './theme-store';
+import { ALL_THEMES_STYLESHEET, THEMES, ThemeStore } from './theme-store';
 
 describe('ThemeStore', () => {
+  const startingTheme = 'fantasy';
   const otherTheme = 'dracula';
   const unknownTheme = 'not-a-daisyui-theme';
+  const root = document.documentElement;
 
   function appliedTheme(): string | null {
     TestBed.flushEffects();
-    return document.documentElement.getAttribute('data-theme');
+    return root.getAttribute('data-theme');
   }
 
-  afterEach(() => document.documentElement.removeAttribute('data-theme'));
+  function allThemesStylesheets(): HTMLLinkElement[] {
+    TestBed.flushEffects();
+    return Array.from(document.head.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')).filter(
+      (link) => link.getAttribute('href') === ALL_THEMES_STYLESHEET,
+    );
+  }
+
+  beforeEach(() => root.setAttribute('data-theme', startingTheme));
+
+  afterEach(() => {
+    root.removeAttribute('data-theme');
+    document.head.querySelectorAll('link[rel="stylesheet"]').forEach((link) => link.remove());
+  });
 
   it('offers every theme daisyUI ships', () => {
     expect(THEMES).toEqual(themeOrder);
   });
 
-  it('offers the default theme', () => {
-    expect(THEMES).toContain(DEFAULT_THEME);
+  describe('starting theme', () => {
+    it('is the theme the document declares', () => {
+      const store = TestBed.inject(ThemeStore);
+
+      expect(store.theme()).toBe(startingTheme);
+    });
+
+    it('stays applied to the root element', () => {
+      TestBed.inject(ThemeStore);
+
+      expect(appliedTheme()).toBe(startingTheme);
+    });
+
+    it('does not load the other themes', () => {
+      TestBed.inject(ThemeStore);
+
+      expect(allThemesStylesheets()).toEqual([]);
+    });
+
+    it('is the first theme when the document declares none', () => {
+      root.removeAttribute('data-theme');
+
+      const store = TestBed.inject(ThemeStore);
+
+      expect(store.theme()).toBe(THEMES[0]);
+      expect(appliedTheme()).toBe(THEMES[0]);
+    });
+
+    it('is the first theme when the document declares one daisyUI does not ship', () => {
+      root.setAttribute('data-theme', unknownTheme);
+
+      const store = TestBed.inject(ThemeStore);
+
+      expect(store.theme()).toBe(THEMES[0]);
+      expect(appliedTheme()).toBe(THEMES[0]);
+    });
+
+    it('loads every theme when it could not come from the document', () => {
+      root.removeAttribute('data-theme');
+
+      TestBed.inject(ThemeStore);
+
+      expect(allThemesStylesheets().length).toBe(1);
+    });
   });
 
-  it('starts in the fantasy theme', () => {
-    const store = TestBed.inject(ThemeStore);
+  describe('loadAllThemes', () => {
+    it('adds the stylesheet holding every theme', () => {
+      const store = TestBed.inject(ThemeStore);
 
-    expect(store.theme()).toBe('fantasy');
+      store.loadAllThemes();
+
+      expect(allThemesStylesheets().length).toBe(1);
+    });
+
+    it('leaves the theme as it was', () => {
+      const store = TestBed.inject(ThemeStore);
+
+      store.loadAllThemes();
+
+      expect(store.theme()).toBe(startingTheme);
+    });
+
+    it('adds the stylesheet only once', () => {
+      const store = TestBed.inject(ThemeStore);
+      store.loadAllThemes();
+      allThemesStylesheets();
+
+      store.loadAllThemes();
+      store.setTheme(otherTheme);
+
+      expect(allThemesStylesheets().length).toBe(1);
+    });
   });
 
-  it('applies the starting theme to the root element', () => {
-    TestBed.inject(ThemeStore);
+  describe('setTheme', () => {
+    it('switches to a selected theme', () => {
+      const store = TestBed.inject(ThemeStore);
 
-    expect(appliedTheme()).toBe(DEFAULT_THEME);
-  });
+      store.setTheme(otherTheme);
 
-  it('switches to a selected theme', () => {
-    const store = TestBed.inject(ThemeStore);
+      expect(store.theme()).toBe(otherTheme);
+    });
 
-    store.setTheme(otherTheme);
+    it('applies a selected theme to the root element', () => {
+      const store = TestBed.inject(ThemeStore);
 
-    expect(store.theme()).toBe(otherTheme);
-  });
+      store.setTheme(otherTheme);
 
-  it('applies a selected theme to the root element', () => {
-    const store = TestBed.inject(ThemeStore);
+      expect(appliedTheme()).toBe(otherTheme);
+    });
 
-    store.setTheme(otherTheme);
+    it('loads every theme, as only the starting one is on the page', () => {
+      const store = TestBed.inject(ThemeStore);
 
-    expect(appliedTheme()).toBe(otherTheme);
-  });
+      store.setTheme(otherTheme);
 
-  it('ignores a theme daisyUI does not ship', () => {
-    const store = TestBed.inject(ThemeStore);
+      expect(allThemesStylesheets().length).toBe(1);
+    });
 
-    store.setTheme(unknownTheme);
+    it('ignores a theme daisyUI does not ship', () => {
+      const store = TestBed.inject(ThemeStore);
 
-    expect(store.theme()).toBe(DEFAULT_THEME);
-    expect(appliedTheme()).toBe(DEFAULT_THEME);
+      store.setTheme(unknownTheme);
+
+      expect(store.theme()).toBe(startingTheme);
+      expect(appliedTheme()).toBe(startingTheme);
+      expect(allThemesStylesheets()).toEqual([]);
+    });
   });
 });

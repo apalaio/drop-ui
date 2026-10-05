@@ -1,23 +1,28 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/angular';
-import { DEFAULT_THEME, THEMES } from '../state/theme-store';
+import { ALL_THEMES_STYLESHEET, THEMES } from '../state/theme-store';
 import { ThemePicker } from './theme-picker';
 
 describe(ThemePicker.name, () => {
   const triggerLabel = 'Change theme';
+  const startingTheme = 'fantasy';
   const otherTheme = 'dracula';
 
   function openList(): void {
     fireEvent.click(screen.getByRole('button', { name: triggerLabel }));
   }
 
-  beforeEach(async () => render(ThemePicker));
+  function allThemesStylesheet(): Element | null {
+    return document.head.querySelector(`link[rel="stylesheet"][href="${ALL_THEMES_STYLESHEET}"]`);
+  }
 
-  afterEach(() => document.documentElement.removeAttribute('data-theme'));
+  beforeEach(async () => {
+    document.documentElement.setAttribute('data-theme', startingTheme);
+    await render(ThemePicker);
+  });
 
-  it('should apply the starting theme to the whole document', async () => {
-    await waitFor(() =>
-      expect(document.documentElement).toHaveAttribute('data-theme', DEFAULT_THEME),
-    );
+  afterEach(() => {
+    document.documentElement.removeAttribute('data-theme');
+    allThemesStylesheet()?.remove();
   });
 
   describe('before the button is clicked', () => {
@@ -28,6 +33,10 @@ describe(ThemePicker.name, () => {
     it('should not render any theme', () => {
       expect(screen.queryAllByRole('menuitemradio').length).toBe(0);
     });
+
+    it('should not load the other themes', () => {
+      expect(allThemesStylesheet()).not.toBeInTheDocument();
+    });
   });
 
   describe('when the button is clicked', () => {
@@ -35,6 +44,10 @@ describe(ThemePicker.name, () => {
 
     it('should render the theme list', async () => {
       expect(await screen.findByRole('menu', { name: 'Themes' })).toBeInTheDocument();
+    });
+
+    it('should load every theme', async () => {
+      await waitFor(() => expect(allThemesStylesheet()).toBeInTheDocument());
     });
 
     it('should list every daisyUI theme', async () => {
@@ -46,7 +59,7 @@ describe(ThemePicker.name, () => {
     });
 
     it('should mark the current theme as checked', async () => {
-      expect(await screen.findByRole('menuitemradio', { name: DEFAULT_THEME })).toHaveAttribute(
+      expect(await screen.findByRole('menuitemradio', { name: startingTheme })).toHaveAttribute(
         'aria-checked',
         'true',
       );
@@ -59,7 +72,7 @@ describe(ThemePicker.name, () => {
     });
 
     it('should focus the current theme', async () => {
-      const current = await screen.findByRole('menuitemradio', { name: DEFAULT_THEME });
+      const current = await screen.findByRole('menuitemradio', { name: startingTheme });
 
       await waitFor(() => expect(current).toHaveFocus());
     });
@@ -95,7 +108,7 @@ describe(ThemePicker.name, () => {
       await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument());
       openList();
 
-      expect(await screen.findByRole('menuitemradio', { name: DEFAULT_THEME })).toHaveAttribute(
+      expect(await screen.findByRole('menuitemradio', { name: startingTheme })).toHaveAttribute(
         'aria-checked',
         'false',
       );

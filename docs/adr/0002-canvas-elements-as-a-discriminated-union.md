@@ -41,30 +41,42 @@ interface BaseCanvasElement<T extends ElementType> {
   column: number;
 }
 
-export interface TextCanvasElement extends BaseCanvasElement<
-  'div' | 'span' | 'text-input' | 'textfield'
-> {
+export interface TextCanvasElement extends BaseCanvasElement<'div' | 'span'> {
   text: string;
 }
 
-export interface DatepickerCanvasElement extends BaseCanvasElement<'datepicker'> {}
+export interface TextControlCanvasElement extends BaseCanvasElement<'text-input' | 'textfield'> {
+  text: string; // the placeholder
+  value: string; // what the user typed
+}
+
+export interface DatepickerCanvasElement extends BaseCanvasElement<'datepicker'> {
+  value: string;
+}
 
 export interface DropdownCanvasElement extends BaseCanvasElement<'dropdown'> {
   options: DropdownOption[];
+  value: string; // value of the selected option
 }
 
-export type CanvasElement = TextCanvasElement | DatepickerCanvasElement | DropdownCanvasElement;
+export type CanvasElement =
+  | TextCanvasElement
+  | TextControlCanvasElement
+  | DatepickerCanvasElement
+  | DropdownCanvasElement;
 ```
+
+`DropdownOption` is part of this model and lives next to it, in [`dropdown-option.ts`](../../src/app/features/builder/models/dropdown-option.ts).
 
 The rules that go with it:
 
 1. **The base is not exported.** Code outside the model file uses `CanvasElement` or one of the concrete interfaces.
-2. **An interface is grouped by fields, not by type.** Four types share `TextCanvasElement` because they carry the same data. A type gets its own interface when its fields differ.
-3. **Type-specific fields are required.** A dropdown always has an `options` array, which starts empty.
+2. **An interface is grouped by fields, not by type.** `div` and `span` share `TextCanvasElement`, and `text-input` and `textfield` share `TextControlCanvasElement`, because each pair carries the same data. A type gets its own interface when its fields differ.
+3. **Type-specific fields are required.** A dropdown always has an `options` array, which starts empty. Every form control always has a `value`, which starts as the empty string. What the user enters in a control is state, not DOM: a control is recreated whenever its element changes cell, and only state survives that.
 4. **Elements are created in one place.** `createElement` in [`builder-store.ts`](../../src/app/features/builder/state/builder-store.ts) switches on the type and returns the right shape. It has no `default` branch, so a type without a case fails to compile.
-5. **Code narrows before using a type-specific field**, with `element.type === 'dropdown'` or `'text' in element`.
-6. **Store updates ignore elements of the wrong kind.** `updateText` changes only elements that have text; `updateOptions` changes only dropdowns.
-7. **Component methods take the narrowed element.** `editText(element: TextCanvasElement)` and `editOptions(element: DropdownCanvasElement)` cannot be called with the wrong kind.
+5. **Code narrows before using a type-specific field**, with `element.type === 'dropdown'`, `'text' in element` or `'value' in element`.
+6. **Store updates ignore elements of the wrong kind.** `updateText` changes only elements that have text; `updateValue` changes only elements that have a value; `updateOptions` changes only dropdowns.
+7. **Component methods take the narrowed element.** `editText(element: TextCanvasElement | TextControlCanvasElement)` and `editOptions(element: DropdownCanvasElement)` cannot be called with the wrong kind.
 8. **The template narrows a local variable and checks exhaustiveness.** [`dropped-element.html`](../../src/app/features/builder/dropped-element/dropped-element.html) reads the input once with `@let el = element();`, switches on `el.type`, and ends with `@default never(el);`.
 
 ### Adding an element type
@@ -93,6 +105,6 @@ The rules that go with it:
 ## Alternatives considered
 
 - **Keep the flat interface and add optional fields.** Rejected for the three problems described in Context, which grow with each new type.
-- **One interface per element type.** Rejected: `div`, `span`, `text-input` and `textfield` would be four identical interfaces. Grouping by fields keeps the union short, and a type can be split out later without touching the others.
+- **One interface per element type.** Rejected: `div` and `span` would be two identical interfaces, as would `text-input` and `textfield`. Grouping by fields keeps the union short, and a type can be split out later without touching the others.
 - **Derive `ElementType` from the union (`CanvasElement['type']`).** This would leave one place to name a type. Not done because `ElementType` is defined with the palette model, which the element model imports; reversing that dependency was not worth it at this size.
 - **A generic `props` bag per element.** Rejected: it moves the type-specific fields out of sight of the type checker, which is the problem this decision solves.

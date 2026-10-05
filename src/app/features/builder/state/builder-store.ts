@@ -1,6 +1,6 @@
 import { computed } from '@angular/core';
 import { patchState, signalStore, withComputed, withMethods, withState } from '@ngrx/signals';
-import { DropdownOption } from '../../../shared/dropdown-options-dialog/dropdown-option';
+import { DropdownOption } from '../models/dropdown-option';
 import { CanvasElement } from '../models/canvas-element';
 import {
   CellPosition,
@@ -41,15 +41,23 @@ const createElement = (
   switch (type) {
     case 'div':
     case 'span':
+      return { ...base, type, text: DEFAULT_ELEMENT_TEXT };
     case 'text-input':
     case 'textfield':
-      return { ...base, type, text: DEFAULT_ELEMENT_TEXT };
+      return { ...base, type, text: DEFAULT_ELEMENT_TEXT, value: '' };
     case 'datepicker':
-      return { ...base, type };
+      return { ...base, type, value: '' };
     case 'dropdown':
-      return { ...base, type, options: [] };
+      return { ...base, type, options: [], value: '' };
   }
 };
+
+const hasOption = (options: DropdownOption[], value: string): boolean =>
+  options.some((option) => option.value === value);
+
+/** A dropdown always shows one of its options, so a selection that is gone falls back to the first. */
+const selectedValue = (options: DropdownOption[], current: string): string =>
+  hasOption(options, current) ? current : (options[0]?.value ?? '');
 
 const CELL_AXIS: Record<GridAxis, keyof CellPosition> = { rows: 'row', columns: 'column' };
 
@@ -115,8 +123,23 @@ export const BuilderStore = signalStore(
     updateOptions(uid: string, options: DropdownOption[]): void {
       patchState(store, ({ canvasElements }) => ({
         canvasElements: canvasElements.map((element) =>
-          element.uid === uid && element.type === 'dropdown' ? { ...element, options } : element,
+          element.uid === uid && element.type === 'dropdown'
+            ? { ...element, options, value: selectedValue(options, element.value) }
+            : element,
         ),
+      }));
+    },
+    updateValue(uid: string, value: string): void {
+      patchState(store, ({ canvasElements }) => ({
+        canvasElements: canvasElements.map((element) => {
+          if (element.uid !== uid || !('value' in element)) {
+            return element;
+          }
+          if (element.type === 'dropdown' && !hasOption(element.options, value)) {
+            return element;
+          }
+          return { ...element, value };
+        }),
       }));
     },
     removeElement(uid: string): void {

@@ -1,5 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/angular';
-import { CanvasElement } from '../models/canvas-element';
+import {
+  CanvasElement,
+  DatepickerCanvasElement,
+  DropdownCanvasElement,
+  TextControlCanvasElement,
+} from '../models/canvas-element';
 import { DroppedElement } from './dropped-element';
 
 describe(DroppedElement.name, () => {
@@ -8,19 +13,40 @@ describe(DroppedElement.name, () => {
   const cell = { row: 0, column: 0 };
   const div: CanvasElement = { uid, type: 'div', paletteUid: 'palette-div', text, ...cell };
   const span: CanvasElement = { uid: 'element-2', type: 'span', paletteUid: 'palette-span', text, ...cell };
-  const textInput: CanvasElement = { ...div, uid: 'element-4', type: 'text-input', paletteUid: 'palette-text-input' };
-  const textfield: CanvasElement = { ...div, uid: 'element-5', type: 'textfield', paletteUid: 'palette-textfield' };
-  const datepicker: CanvasElement = { uid: 'element-6', type: 'datepicker', paletteUid: 'palette-datepicker', ...cell };
+  const typed = 'Ada';
+  const pickedDate = '2026-10-05';
+  const textInput: TextControlCanvasElement = {
+    uid: 'element-4',
+    type: 'text-input',
+    paletteUid: 'palette-text-input',
+    text,
+    value: '',
+    ...cell,
+  };
+  const textfield: TextControlCanvasElement = {
+    ...textInput,
+    uid: 'element-5',
+    type: 'textfield',
+    paletteUid: 'palette-textfield',
+  };
+  const datepicker: DatepickerCanvasElement = {
+    uid: 'element-6',
+    type: 'datepicker',
+    paletteUid: 'palette-datepicker',
+    value: '',
+    ...cell,
+  };
   const formControlTestIds = ['dropped-text-input', 'dropped-textfield', 'dropped-datepicker'];
   const otherTestIds = (testId: string) =>
     ['dropped-div', 'dropped-span', 'dropped-dropdown', ...formControlTestIds].filter((other) => other !== testId);
   const small = { text: 'Small', value: 's' };
   const large = { text: 'Large', value: 'l' };
-  const dropdown: CanvasElement = {
+  const dropdown: DropdownCanvasElement = {
     uid: 'element-3',
     type: 'dropdown',
     paletteUid: 'palette-dropdown',
     options: [small, large],
+    value: small.value,
     ...cell,
   };
 
@@ -91,8 +117,20 @@ describe(DroppedElement.name, () => {
       expect(screen.getByRole('textbox', { name: 'Text input' })).toHaveAttribute('placeholder', text);
     });
 
+    it('should be empty while the element has no value', () => {
+      expect(screen.getByRole('textbox', { name: 'Text input' })).toHaveValue('');
+    });
+
     it.each(otherTestIds('dropped-text-input'))('should not render %s', (testId) => {
       expect(screen.queryByTestId(testId)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('text input element with a value', () => {
+    beforeEach(async () => mount({ ...textInput, value: typed }));
+
+    it('should show the element value', () => {
+      expect(screen.getByRole('textbox', { name: 'Text input' })).toHaveValue(typed);
     });
   });
 
@@ -112,6 +150,14 @@ describe(DroppedElement.name, () => {
     });
   });
 
+  describe('textfield element with a value', () => {
+    beforeEach(async () => mount({ ...textfield, value: typed }));
+
+    it('should show the element value', () => {
+      expect(screen.getByRole('textbox', { name: 'Textfield' })).toHaveValue(typed);
+    });
+  });
+
   describe('datepicker element', () => {
     beforeEach(async () => mount(datepicker));
 
@@ -121,6 +167,14 @@ describe(DroppedElement.name, () => {
 
     it.each(otherTestIds('dropped-datepicker'))('should not render %s', (testId) => {
       expect(screen.queryByTestId(testId)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('datepicker element with a value', () => {
+    beforeEach(async () => mount({ ...datepicker, value: pickedDate }));
+
+    it('should show the element value', () => {
+      expect(screen.getByLabelText('Datepicker')).toHaveValue(pickedDate);
     });
   });
 
@@ -142,6 +196,10 @@ describe(DroppedElement.name, () => {
         expect(screen.getByRole('option', { name: large.text })).toHaveValue(large.value);
       });
 
+      it('should select the option the element value names', () => {
+        expect(screen.getByRole('combobox', { name: 'Dropdown' })).toHaveValue(small.value);
+      });
+
       it.each(formControlTestIds)('should not render %s', (testId) => {
         expect(screen.queryByTestId(testId)).not.toBeInTheDocument();
       });
@@ -155,8 +213,16 @@ describe(DroppedElement.name, () => {
       });
     });
 
+    describe('with a later option selected', () => {
+      beforeEach(async () => mount({ ...dropdown, value: large.value }));
+
+      it('should select that option', () => {
+        expect(screen.getByRole('combobox', { name: 'Dropdown' })).toHaveValue(large.value);
+      });
+    });
+
     describe('without options', () => {
-      beforeEach(async () => mount({ ...dropdown, options: [] }));
+      beforeEach(async () => mount({ ...dropdown, options: [], value: '' }));
 
       it('should render a select with no options', () => {
         expect(screen.getByRole('combobox', { name: 'Dropdown' })).toBeInTheDocument();

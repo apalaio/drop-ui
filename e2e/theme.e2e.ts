@@ -1,5 +1,7 @@
 import { expect, Locator, Page, test } from '@playwright/test';
 
+const unthemed = 'rgba(0, 0, 0, 0)';
+
 async function openThemeList(page: Page): Promise<void> {
   await page.getByRole('banner').getByRole('button', { name: 'Change theme' }).click();
 }
@@ -12,10 +14,36 @@ function background(locator: Locator): Promise<string> {
   return locator.evaluate((element) => getComputedStyle(element).backgroundColor);
 }
 
+function requestedPaths(page: Page): string[] {
+  const paths: string[] = [];
+  page.on('request', (request) => paths.push(new URL(request.url()).pathname));
+  return paths;
+}
+
 test('starts in the fantasy theme', async ({ page }) => {
   await page.goto('/');
 
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'fantasy');
+});
+
+test('starts themed without loading the other themes', async ({ page }) => {
+  const requested = requestedPaths(page);
+
+  await page.goto('/');
+
+  await expect(page.getByRole('banner')).toBeVisible();
+  expect(await background(page.getByRole('banner'))).not.toBe(unthemed);
+  expect(requested).toContain('/themes/fantasy.css');
+  expect(requested).not.toContain('/themes.css');
+});
+
+test('loads the other themes when the theme list is opened', async ({ page }) => {
+  const requested = requestedPaths(page);
+  await page.goto('/');
+
+  await openThemeList(page);
+
+  await expect.poll(() => requested).toContain('/themes.css');
 });
 
 test('opens the theme list scrolled to the current theme', async ({ page }) => {
@@ -38,8 +66,10 @@ test('picking a theme restyles the whole app', async ({ page }) => {
   await theme(page, 'dracula').click();
 
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dracula');
-  expect(await background(header)).not.toBe(headerBefore);
-  expect(await background(main)).not.toBe(mainBefore);
+  await expect.poll(() => background(header)).not.toBe(headerBefore);
+  await expect.poll(() => background(header)).not.toBe(unthemed);
+  await expect.poll(() => background(main)).not.toBe(mainBefore);
+  await expect.poll(() => background(main)).not.toBe(unthemed);
 });
 
 test('a picked theme also restyles overlays rendered outside the app root', async ({ page }) => {
@@ -52,5 +82,6 @@ test('a picked theme also restyles overlays rendered outside the app root', asyn
   await openThemeList(page);
 
   await expect(theme(page, 'dracula')).toBeChecked();
-  expect(await background(themeList)).not.toBe(themeListBefore);
+  await expect.poll(() => background(themeList)).not.toBe(themeListBefore);
+  await expect.poll(() => background(themeList)).not.toBe(unthemed);
 });

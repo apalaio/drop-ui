@@ -35,11 +35,11 @@ Shared state is held in NgRx SignalStores (`@ngrx/signals`). The rules below des
 ### How a store is written
 
 6. **Each method is one `patchState` call with an updater function** that returns new objects and arrays. One user action is therefore one atomic state change.
-7. **The store owns its invariants.** It validates and normalises what it is given, and callers pass raw values. Examples: `setGridSize` ignores non-finite numbers and clamps to 1–12; `setTheme` ignores names that are not daisyUI themes; `updateText` ignores an element that has no text.
+7. **The store owns its invariants.** It validates and normalises what it is given, and callers pass raw values. Examples: `setGridSize` ignores non-finite numbers and clamps to 1–12; `setTheme` ignores names that are not daisyUI themes; `updateText` ignores an element that has no text; `updateValue` ignores a dropdown value that none of its options has, and `updateOptions` moves the selection to the first option when the selected one is gone.
 8. **Derived data is a `withComputed` signal and is never stored.** `BuilderStore.cells` is built from `grid` and `canvasElements`.
 9. **Stored state is flat.** `canvasElements` is one array for the whole canvas. Each element carries its `row` and `column`, and the order of two elements in the same cell is their relative order in the array.
 10. **Pure helpers are module-level functions above the store** (`createElement`, `insertIntoCell`, `clampGridSize`), so methods stay short and the helpers need no store to reason about.
-11. **Side effects go in `withHooks`.** `ThemeStore` starts an `effect` in `onInit` that writes the theme to `<html data-theme>`.
+11. **Side effects go in `withHooks`.** `ThemeStore` starts two `effect`s in `onInit`: one writes the theme to `<html data-theme>`, the other adds the stylesheet holding every theme once `allThemesRequested` is set. Methods only patch state; `loadAllThemes` sets that flag and the effect does the DOM work.
 12. **RxJS appears only where a library hands back an Observable**, which today means the `closed` stream of a CDK dialog.
 
 ### How stores are tested
@@ -61,7 +61,7 @@ A store is tested for real in a `*.spec.ts` through `TestBed.inject` and its pub
 - **Nothing is persisted.** State is in memory and a reload resets it. Persistence would be added behind the store, not in components.
 - **`cells` is recomputed in full on every element or grid change.** It filters the whole element list once per cell. This is fine at the 12 × 12 cap and would need indexing if the cap is raised.
 - **Flat storage makes some results depend on history.** When the grid shrinks and two cells merge, the merged order follows the array, which reflects the order of earlier drops and moves.
-- **Root stores are created on first injection.** `ThemeStore`'s effect does not run until the theme picker is created, so `index.html` sets the default theme itself to have the first paint themed.
+- **Root stores are created on first injection, and one reads its starting state from the page.** `ThemeStore` does not exist until the theme picker is created, so `index.html` themes the first paint itself: it names the starting theme in `data-theme` on `<html>` and links that theme's CSS. The store reads the name from that attribute instead of repeating it, which makes `index.html` the only place the default theme is written. A spec or component test has to set the attribute before the store is created.
 - **Components depend on the concrete store.** Reusing a builder component elsewhere means providing a store with the same shape.
 
 ## Alternatives considered

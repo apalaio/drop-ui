@@ -3,6 +3,7 @@
   class="btn btn-ghost btn-sm gap-1.5 px-1.5"
   aria-label="Change theme"
   [cdkMenuTriggerFor]="themeList"
+  (cdkMenuOpened)="store.loadAllThemes()"
 >
   <span
     class="grid shrink-0 grid-cols-2 gap-0.5 rounded-md border border-base-content/10 bg-base-100 p-1"

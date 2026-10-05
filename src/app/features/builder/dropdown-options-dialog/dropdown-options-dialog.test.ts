@@ -1,8 +1,8 @@
 import { Dialog, DialogRef } from '@angular/cdk/dialog';
 import { Component, inject, signal } from '@angular/core';
 import { fireEvent, render, screen, waitFor } from '@testing-library/angular';
-import { DropdownOption } from './dropdown-option';
-import { DropDownOptionsDialog, openDropDownOptionsDialog } from './dropdown-options-dialog';
+import { DropdownOption } from '../models/dropdown-option';
+import { DropdownOptionsDialog, openDropdownOptionsDialog } from './dropdown-options-dialog';
 
 const title = 'Dropdown options';
 const cancelled = 'cancelled';
@@ -21,17 +21,17 @@ class DialogHost {
   protected readonly result = signal('');
 
   protected open(): void {
-    openDropDownOptionsDialog(this.dialog, { title, options: [small] }).subscribe((options) =>
+    openDropdownOptionsDialog(this.dialog, { title, options: [small] }).subscribe((options) =>
       this.result.set(options ? JSON.stringify(options) : cancelled),
     );
   }
 }
 
-describe(DropDownOptionsDialog.name, () => {
-  const subtitle = 'Add the options of this dropdown.';
+describe(DropdownOptionsDialog.name, () => {
+  const description = 'Add the options of this dropdown.';
 
-  async function mount(inputs: { subtitle?: string; options?: DropdownOption[] } = {}) {
-    return render(DropDownOptionsDialog, {
+  async function mount(inputs: { description?: string; options?: DropdownOption[] } = {}) {
+    return render(DropdownOptionsDialog, {
       inputs: { title, ...inputs },
       providers: [{ provide: DialogRef, useValue: { close: () => undefined } }],
     });
@@ -43,17 +43,17 @@ describe(DropDownOptionsDialog.name, () => {
     expect(screen.getByRole('heading', { name: title })).toBeInTheDocument();
   });
 
-  describe('subtitle', () => {
+  describe('description', () => {
     it('should render when given', async () => {
-      await mount({ subtitle });
+      await mount({ description });
 
-      expect(screen.getByText(subtitle)).toBeInTheDocument();
+      expect(screen.getByText(description)).toBeInTheDocument();
     });
 
     it('should not render when empty', async () => {
       await mount();
 
-      expect(screen.queryByTestId('dialog-subtitle')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('dialog-description')).not.toBeInTheDocument();
     });
   });
 

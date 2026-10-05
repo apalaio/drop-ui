@@ -23,6 +23,17 @@ async function drag(page: Page, source: Locator, target: Locator): Promise<void>
   await dragBetween(page, await centerOf(source), await centerOf(target));
 }
 
+async function dragByWrapper(page: Page, wrapper: Locator, target: Locator): Promise<void> {
+  const box = await wrapper.boundingBox();
+  if (!box) throw new Error('Dropped element is not visible');
+  const besideTheControl = { x: box.x + box.width - 16, y: box.y + box.height - 8 };
+  await dragBetween(page, besideTheControl, await centerOf(target));
+}
+
+async function nextRender(page: Page): Promise<void> {
+  await page.evaluate(() => new Promise<void>((rendered) => requestAnimationFrame(() => setTimeout(rendered))));
+}
+
 function cell(canvas: Locator, row: number, column: number): Locator {
   return canvas.getByRole('group', { name: `Row ${row}, column ${column}`, exact: true });
 }
@@ -107,12 +118,84 @@ test('moves a dropped text input to another cell when dragged by its wrapper', a
   await drag(page, palette.getByRole('listitem').filter({ hasText: 'Text input' }), cell(canvas, 1, 1));
   await expect(cell(canvas, 1, 1).getByTestId('dropped-text-input')).toHaveCount(1);
 
-  const wrapper = await cell(canvas, 1, 1).locator('[data-element-type="text-input"]').boundingBox();
-  if (!wrapper) throw new Error('Dropped text input is not visible');
-  const besideTheControl = { x: wrapper.x + wrapper.width - 16, y: wrapper.y + wrapper.height - 8 };
-
-  await dragBetween(page, besideTheControl, await centerOf(cell(canvas, 1, 2)));
+  await dragByWrapper(page, cell(canvas, 1, 1).locator('[data-element-type="text-input"]'), cell(canvas, 1, 2));
 
   await expect(cell(canvas, 1, 2).getByTestId('dropped-text-input')).toHaveCount(1);
   await expect(cell(canvas, 1, 1).getByTestId('dropped-text-input')).toHaveCount(0);
+});
+
+test('keeps what was typed and picked when the controls are moved to another cell', async ({ page }) => {
+  await page.goto('/');
+  const palette = page.getByRole('complementary', { name: 'Sidebar' });
+  const canvas = page.getByRole('region', { name: 'Canvas' });
+  await setColumns(page, 2);
+  const controls = [
+    { label: 'Text input', type: 'text-input', testId: 'dropped-text-input', value: 'Ada' },
+    { label: 'Textfield', type: 'textfield', testId: 'dropped-textfield', value: 'Two\nlines' },
+    { label: 'Datepicker', type: 'datepicker', testId: 'dropped-datepicker', value: '2026-10-05' },
+  ];
+
+  for (const { label, type, testId, value } of controls) {
+    await drag(page, palette.getByRole('listitem').filter({ hasText: label }), cell(canvas, 1, 1));
+    await cell(canvas, 1, 1).getByTestId(testId).fill(value);
+
+    await dragByWrapper(page, cell(canvas, 1, 1).locator(`[data-element-type="${type}"]`), cell(canvas, 1, 2));
+
+    await expect(page.getByTestId(testId)).toHaveCount(1);
+    await expect(cell(canvas, 1, 2).getByTestId(testId)).toHaveValue(value);
+  }
+});
+
+test('keeps the selected option when a dropdown is moved to another cell', async ({ page }) => {
+  await page.goto('/');
+  const palette = page.getByRole('complementary', { name: 'Sidebar' });
+  const canvas = page.getByRole('region', { name: 'Canvas' });
+  await setColumns(page, 2);
+  await drag(page, palette.getByRole('listitem').filter({ hasText: 'Dropdown' }), cell(canvas, 1, 1));
+  await canvas.getByRole('button', { name: 'Element actions' }).click();
+  await page.getByRole('menuitem', { name: 'Edit options' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Edit options' });
+  await dialog.getByRole('textbox', { name: 'Option 1 text' }).fill('Small');
+  await dialog.getByRole('textbox', { name: 'Option 1 value' }).fill('s');
+  await dialog.getByRole('button', { name: 'Add option' }).click();
+  await dialog.getByRole('textbox', { name: 'Option 2 text' }).fill('Large');
+  await dialog.getByRole('textbox', { name: 'Option 2 value' }).fill('l');
+  await dialog.getByRole('button', { name: 'Save' }).click();
+  await expect(dialog).toBeHidden();
+  await cell(canvas, 1, 1).getByRole('combobox', { name: 'Dropdown' }).selectOption({ label: 'Large' });
+
+  await dragByWrapper(page, cell(canvas, 1, 1).locator('[data-element-type="dropdown"]'), cell(canvas, 1, 2));
+
+  await expect(page.getByTestId('dropped-dropdown')).toHaveCount(1);
+  await expect(cell(canvas, 1, 2).getByRole('combobox', { name: 'Dropdown' })).toHaveValue('l');
+});
+
+test('keeps what was typed when the grid shrinks and the cell of the control is removed', async ({ page }) => {
+  await page.goto('/');
+  const palette = page.getByRole('complementary', { name: 'Sidebar' });
+  const canvas = page.getByRole('region', { name: 'Canvas' });
+  await setColumns(page, 2);
+  await drag(page, palette.getByRole('listitem').filter({ hasText: 'Text input' }), cell(canvas, 1, 2));
+  await cell(canvas, 1, 2).getByTestId('dropped-text-input').fill('Ada');
+
+  await setColumns(page, 1);
+
+  await expect(cell(canvas, 1, 1).getByTestId('dropped-text-input')).toHaveValue('Ada');
+});
+
+test('keeps the rest of a picked date while one of its parts is retyped', async ({ page }) => {
+  await page.goto('/');
+  const palette = page.getByRole('complementary', { name: 'Sidebar' });
+  const canvas = page.getByRole('region', { name: 'Canvas' });
+  await drag(page, palette.getByRole('listitem').filter({ hasText: 'Datepicker' }), canvas);
+  const date = canvas.getByTestId('dropped-datepicker');
+  await date.fill('2026-10-05');
+  await nextRender(page);
+
+  await date.focus();
+  await page.keyboard.press('Backspace');
+  await nextRender(page);
+
+  await expect(date).toHaveValue('');
+  expect(await date.evaluate((input: HTMLInputElement) => input.validity.badInput)).toBe(true);
 });

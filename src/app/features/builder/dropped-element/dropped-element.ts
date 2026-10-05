@@ -2,9 +2,14 @@ import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { Component, computed, inject, input } from '@angular/core';
 import { openConfirmationDialog } from '../../../shared/confirmation-dialog/confirmation-dialog';
-import { openDropDownOptionsDialog } from '../../../shared/dropdown-options-dialog/dropdown-options-dialog';
+import { openDropdownOptionsDialog } from '../dropdown-options-dialog/dropdown-options-dialog';
 import { openTextInputDialog } from '../../../shared/text-input-dialog/text-input-dialog';
-import { CanvasElement, DropdownCanvasElement, TextCanvasElement } from '../models/canvas-element';
+import {
+  CanvasElement,
+  DropdownCanvasElement,
+  TextCanvasElement,
+  TextControlCanvasElement,
+} from '../models/canvas-element';
 import { ElementType } from '../models/palette-item';
 import { BuilderStore } from '../state/builder-store';
 
@@ -36,7 +41,7 @@ export class DroppedElement {
   private readonly store = inject(BuilderStore);
   private readonly dialog = inject(Dialog);
 
-  protected editText({ uid, type, text }: TextCanvasElement): void {
+  protected editText({ uid, type, text }: TextCanvasElement | TextControlCanvasElement): void {
     openTextInputDialog(this.dialog, {
       title: 'Edit text',
       description: `Change the text shown inside this <${type}>.`,
@@ -49,15 +54,24 @@ export class DroppedElement {
   }
 
   protected editOptions({ uid, type, options }: DropdownCanvasElement): void {
-    openDropDownOptionsDialog(this.dialog, {
+    openDropdownOptionsDialog(this.dialog, {
       title: 'Edit options',
-      subtitle: `Set the text and value of each option in this <${type}>.`,
+      description: `Set the text and value of each option in this <${type}>.`,
       options,
     }).subscribe((newOptions) => {
       if (newOptions !== undefined) {
         this.store.updateOptions(uid, newOptions);
       }
     });
+  }
+
+  protected updateValue(
+    uid: string,
+    control: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement,
+  ): void {
+    if (!control.validity.badInput) {
+      this.store.updateValue(uid, control.value);
+    }
   }
 
   protected deleteElement(): void {

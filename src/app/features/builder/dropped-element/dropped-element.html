@@ -60,45 +60,58 @@
   }
   @case ('text-input') {
     <input
+      #control
       type="text"
       class="input"
       aria-label="Text input"
       data-testid="dropped-text-input"
       [placeholder]="el.text"
+      [value]="el.value"
+      (input)="updateValue(el.uid, control)"
       (mousedown)="$event.stopPropagation()"
       (touchstart)="$event.stopPropagation()"
     />
   }
   @case ('textfield') {
     <textarea
+      #control
       class="textarea"
       aria-label="Textfield"
       data-testid="dropped-textfield"
       [placeholder]="el.text"
+      [value]="el.value"
+      (input)="updateValue(el.uid, control)"
       (mousedown)="$event.stopPropagation()"
       (touchstart)="$event.stopPropagation()"
     ></textarea>
   }
   @case ('datepicker') {
     <input
+      #control
       type="date"
       class="input"
       aria-label="Datepicker"
       data-testid="dropped-datepicker"
+      [value]="el.value"
+      (input)="updateValue(el.uid, control)"
       (mousedown)="$event.stopPropagation()"
       (touchstart)="$event.stopPropagation()"
     />
   }
   @case ('dropdown') {
     <select
+      #control
       class="select"
       aria-label="Dropdown"
       data-testid="dropped-dropdown"
+      (change)="updateValue(el.uid, control)"
       (mousedown)="$event.stopPropagation()"
       (touchstart)="$event.stopPropagation()"
     >
       @for (option of el.options; track $index) {
-        <option [value]="option.value">{{ option.text }}</option>
+        <option [value]="option.value" [selected]="option.value === el.value">
+          {{ option.text }}
+        </option>
       }
     </select>
   }

@@ -1,12 +1,13 @@
 import { Dialog } from '@angular/cdk/dialog';
 import { TestBed } from '@angular/core/testing';
 import { Observable, of } from 'rxjs';
-import { DropdownOption } from '../../../shared/dropdown-options-dialog/dropdown-option';
+import { DropdownOption } from '../models/dropdown-option';
 import {
   CanvasElement,
   DatepickerCanvasElement,
   DropdownCanvasElement,
   TextCanvasElement,
+  TextControlCanvasElement,
 } from '../models/canvas-element';
 import { BuilderStore } from '../state/builder-store';
 import { DroppedElement } from './dropped-element';
@@ -15,12 +16,25 @@ describe('DroppedElement', () => {
   const cell = { row: 0, column: 0 };
   const div: TextCanvasElement = { uid: 'element-1', type: 'div', paletteUid: 'palette-div', text: 'enter text', ...cell };
   const span: TextCanvasElement = { ...div, uid: 'element-2', type: 'span', paletteUid: 'palette-span' };
-  const textInput: TextCanvasElement = { ...div, uid: 'element-4', type: 'text-input', paletteUid: 'palette-text-input' };
-  const textfield: TextCanvasElement = { ...div, uid: 'element-5', type: 'textfield', paletteUid: 'palette-textfield' };
+  const textInput: TextControlCanvasElement = {
+    uid: 'element-4',
+    type: 'text-input',
+    paletteUid: 'palette-text-input',
+    text: 'enter text',
+    value: '',
+    ...cell,
+  };
+  const textfield: TextControlCanvasElement = {
+    ...textInput,
+    uid: 'element-5',
+    type: 'textfield',
+    paletteUid: 'palette-textfield',
+  };
   const datepicker: DatepickerCanvasElement = {
     uid: 'element-6',
     type: 'datepicker',
     paletteUid: 'palette-datepicker',
+    value: '',
     ...cell,
   };
   const options: DropdownOption[] = [{ text: 'Small', value: 's' }];
@@ -29,18 +43,20 @@ describe('DroppedElement', () => {
     type: 'dropdown',
     paletteUid: 'palette-dropdown',
     options,
+    value: 's',
     ...cell,
   };
 
   let store: {
     updateText: ReturnType<typeof vi.fn>;
     updateOptions: ReturnType<typeof vi.fn>;
+    updateValue: ReturnType<typeof vi.fn>;
     removeElement: ReturnType<typeof vi.fn>;
   };
   let dialogResult: Observable<string | true | DropdownOption[] | undefined>;
 
   beforeEach(() => {
-    store = { updateText: vi.fn(), updateOptions: vi.fn(), removeElement: vi.fn() };
+    store = { updateText: vi.fn(), updateOptions: vi.fn(), updateValue: vi.fn(), removeElement: vi.fn() };
     dialogResult = of(undefined);
     TestBed.configureTestingModule({
       providers: [
@@ -130,6 +146,30 @@ describe('DroppedElement', () => {
       create(dropdown).componentInstance['editOptions'](dropdown);
 
       expect(store.updateOptions).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('updateValue', () => {
+    function control(value: string, badInput = false): HTMLInputElement {
+      return { value, validity: { badInput } } as HTMLInputElement;
+    }
+
+    it('stores the value of the control', () => {
+      create(textInput).componentInstance['updateValue'](textInput.uid, control('Ada'));
+
+      expect(store.updateValue).toHaveBeenCalledWith(textInput.uid, 'Ada');
+    });
+
+    it('stores an emptied control', () => {
+      create(datepicker).componentInstance['updateValue'](datepicker.uid, control(''));
+
+      expect(store.updateValue).toHaveBeenCalledWith(datepicker.uid, '');
+    });
+
+    it('leaves the value unchanged while the control holds an incomplete entry', () => {
+      create(datepicker).componentInstance['updateValue'](datepicker.uid, control('', true));
+
+      expect(store.updateValue).not.toHaveBeenCalled();
     });
   });
 

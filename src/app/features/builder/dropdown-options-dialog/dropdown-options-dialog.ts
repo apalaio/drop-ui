@@ -12,7 +12,7 @@ import {
 } from '@angular/core';
 import { applyEach, form, FormField, FormRoot, validate } from '@angular/forms/signals';
 import { Observable } from 'rxjs';
-import { DropdownOption } from './dropdown-option';
+import { DropdownOption } from '../models/dropdown-option';
 
 const BLANK_OPTION: DropdownOption = { text: '', value: '' };
 
@@ -26,9 +26,9 @@ function copyOption({ text, value }: DropdownOption): DropdownOption {
   templateUrl: './dropdown-options-dialog.html',
   host: { class: 'block w-[min(36rem,90vw)] rounded-box bg-base-100 p-6 shadow-xl' },
 })
-export class DropDownOptionsDialog {
+export class DropdownOptionsDialog {
   readonly title = input.required<string>();
-  readonly subtitle = input('');
+  readonly description = input('');
   readonly options = input<DropdownOption[]>([]);
 
   private readonly dialogRef = inject<DialogRef<DropdownOption[]>>(DialogRef);
@@ -61,7 +61,6 @@ export class DropDownOptionsDialog {
 
   protected removeOption(index: number): void {
     this.model.update(({ options }) => ({ options: options.filter((_, i) => i !== index) }));
-    // The clicked delete button is gone, which would otherwise drop focus out of the dialog.
     this.focusRow(index - 1);
   }
 
@@ -76,22 +75,21 @@ export class DropDownOptionsDialog {
   }
 }
 
-export interface DropDownOptionsDialogOptions {
+export interface DropdownOptionsDialogOptions {
   title: string;
-  subtitle?: string;
-  /** Rows the dialog starts with; an empty/omitted list starts with one blank row. */
+  description?: string;
   options?: DropdownOption[];
 }
 
-export function openDropDownOptionsDialog(
+export function openDropdownOptionsDialog(
   dialog: Dialog,
-  { title, subtitle = '', options = [] }: DropDownOptionsDialogOptions,
+  { title, description = '', options = [] }: DropdownOptionsDialogOptions,
 ): Observable<DropdownOption[] | undefined> {
-  return dialog.open<DropdownOption[]>(DropDownOptionsDialog, {
+  return dialog.open<DropdownOption[]>(DropdownOptionsDialog, {
     ariaLabel: title,
     bindings: [
       inputBinding('title', () => title),
-      inputBinding('subtitle', () => subtitle),
+      inputBinding('description', () => description),
       inputBinding('options', () => options),
     ],
   }).closed;

@@ -1,17 +1,17 @@
 import { Dialog, DialogRef } from '@angular/cdk/dialog';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { submit } from '@angular/forms/signals';
-import { DropDownOptionsDialog, openDropDownOptionsDialog } from './dropdown-options-dialog';
+import { DropdownOptionsDialog, openDropdownOptionsDialog } from './dropdown-options-dialog';
 
-describe('DropDownOptionsDialog', () => {
+describe('DropdownOptionsDialog', () => {
   let dialogRef: { close: ReturnType<typeof vi.fn> };
-  let fixture: ComponentFixture<DropDownOptionsDialog>;
-  let dialog: DropDownOptionsDialog;
+  let fixture: ComponentFixture<DropdownOptionsDialog>;
+  let dialog: DropdownOptionsDialog;
 
   beforeEach(() => {
     dialogRef = { close: vi.fn() };
     TestBed.configureTestingModule({ providers: [{ provide: DialogRef, useValue: dialogRef }] });
-    fixture = TestBed.createComponent(DropDownOptionsDialog);
+    fixture = TestBed.createComponent(DropdownOptionsDialog);
     fixture.componentRef.setInput('title', 'Dropdown options');
     dialog = fixture.componentInstance;
   });
@@ -70,19 +70,19 @@ describe('DropDownOptionsDialog', () => {
   });
 });
 
-describe('openDropDownOptionsDialog', () => {
+describe('openDropdownOptionsDialog', () => {
   it('opens the dialog with the given inputs, labelled by its title', () => {
     const dialog = TestBed.inject(Dialog);
     const open = vi.spyOn(dialog, 'open');
 
-    openDropDownOptionsDialog(dialog, {
+    openDropdownOptionsDialog(dialog, {
       title: 'Dropdown options',
-      subtitle: 'Add the options.',
+      description: 'Add the options.',
       options: [{ text: 'Small', value: 's' }],
     });
 
     const [component, config] = open.mock.calls[0];
-    expect(component).toBe(DropDownOptionsDialog);
+    expect(component).toBe(DropdownOptionsDialog);
     expect(config?.ariaLabel).toBe('Dropdown options');
     expect(config?.bindings).toHaveLength(3);
     dialog.closeAll();

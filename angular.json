@@ -23,6 +23,15 @@
               {
                 "glob": "**/*",
                 "input": "public"
+              },
+              {
+                "glob": "*.css",
+                "input": "node_modules/daisyui/theme",
+                "output": "themes"
+              },
+              {
+                "glob": "themes.css",
+                "input": "node_modules/daisyui"
               }
             ],
             "styles": ["src/styles.css"]

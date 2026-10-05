@@ -4,29 +4,51 @@ import themeOrder from 'daisyui/functions/themeOrder';
 
 interface ThemeState {
   theme: string;
+  /** Whether the stylesheet holding every theme is wanted; the page starts with its starting theme's alone. */
+  allThemesRequested: boolean;
 }
 
-/** Every theme daisyUI ships, in its own order; `themes: all` in `styles.css` builds the same set. */
 export const THEMES: readonly string[] = themeOrder;
 
-/** Also set on `<html>` in `index.html`, so the first paint is already themed. */
-export const DEFAULT_THEME = 'fantasy';
+/** daisyUI's prebuilt stylesheet of every theme, copied to the app root by the build. */
+export const ALL_THEMES_STYLESHEET = 'themes.css';
+
+/**
+ * `index.html` names the starting theme on `<html>` and links that theme's CSS, so the name is read
+ * from there rather than repeated. Any other start has no CSS on the page and needs the full set.
+ */
+const createInitialState = (root: HTMLElement): ThemeState => {
+  const declared = root.getAttribute('data-theme');
+  return declared !== null && THEMES.includes(declared)
+    ? { theme: declared, allThemesRequested: false }
+    : { theme: THEMES[0], allThemesRequested: true };
+};
 
 export const ThemeStore = signalStore(
   { providedIn: 'root' },
-  withState<ThemeState>({ theme: DEFAULT_THEME }),
+  withState(() => createInitialState(inject(DOCUMENT).documentElement)),
   withMethods((store) => ({
+    loadAllThemes(): void {
+      patchState(store, { allThemesRequested: true });
+    },
     setTheme(theme: string): void {
       if (THEMES.includes(theme)) {
-        patchState(store, { theme });
+        patchState(store, { theme, allThemesRequested: true });
       }
     },
   })),
   withHooks({
-    onInit({ theme }) {
-      // On the root element rather than the shell, so CDK overlays under <body> are themed too.
-      const root = inject(DOCUMENT).documentElement;
-      effect(() => root.setAttribute('data-theme', theme()));
+    onInit({ theme, allThemesRequested }) {
+      const document = inject(DOCUMENT);
+      effect(() => document.documentElement.setAttribute('data-theme', theme()));
+      effect(() => {
+        if (allThemesRequested()) {
+          const link = document.createElement('link');
+          link.rel = 'stylesheet';
+          link.href = ALL_THEMES_STYLESHEET;
+          document.head.appendChild(link);
+        }
+      });
     },
   }),
 );
