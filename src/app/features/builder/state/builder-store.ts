@@ -1,5 +1,6 @@
 import { computed } from '@angular/core';
 import { patchState, signalStore, withComputed, withMethods, withState } from '@ngrx/signals';
+import { DropdownOption } from '../../../shared/dropdown-options-dialog/dropdown-option';
 import { CanvasElement } from '../models/canvas-element';
 import {
   CellPosition,
@@ -14,11 +15,9 @@ import { PaletteItem } from '../models/palette-item';
 interface BuilderState {
   paletteItems: PaletteItem[];
   grid: GridLayout;
-  /** Flat across all cells; only the relative order of elements that share a cell is meaningful. */
   canvasElements: CanvasElement[];
 }
 
-/** Text a freshly dropped element starts with, until the user edits it. */
 export const DEFAULT_ELEMENT_TEXT = 'enter text';
 
 const createInitialState = (): BuilderState => ({
@@ -28,6 +27,7 @@ const createInitialState = (): BuilderState => ({
     { uid: crypto.randomUUID(), type: 'text-input', label: 'Text input' },
     { uid: crypto.randomUUID(), type: 'textfield', label: 'Textfield' },
     { uid: crypto.randomUUID(), type: 'datepicker', label: 'Datepicker' },
+    { uid: crypto.randomUUID(), type: 'dropdown', label: 'Dropdown' },
   ],
   grid: { rows: 1, columns: 1 },
   canvasElements: [],
@@ -46,6 +46,8 @@ const createElement = (
       return { ...base, type, text: DEFAULT_ELEMENT_TEXT };
     case 'datepicker':
       return { ...base, type };
+    case 'dropdown':
+      return { ...base, type, options: [] };
   }
 };
 
@@ -57,7 +59,6 @@ const clampGridSize = (size: number): number =>
 const isInCell = (element: CanvasElement, { row, column }: CellPosition): boolean =>
   element.row === row && element.column === column;
 
-/** Inserts `element` at `index` among the elements of its own cell; every other cell keeps its order. */
 const insertIntoCell = (
   elements: CanvasElement[],
   element: CanvasElement,
@@ -76,13 +77,15 @@ export const BuilderStore = signalStore(
       const { rows, columns } = grid();
       const elements = canvasElements();
       return Array.from({ length: rows * columns }, (_, cellIndex) => {
-        const cell: CellPosition = { row: Math.floor(cellIndex / columns), column: cellIndex % columns };
+        const cell: CellPosition = {
+          row: Math.floor(cellIndex / columns),
+          column: cellIndex % columns,
+        };
         return { ...cell, elements: elements.filter((element) => isInCell(element, cell)) };
       });
     }),
   })),
   withMethods((store) => ({
-    /** Elements in removed rows or columns move to the last remaining one. */
     setGridSize(axis: GridAxis, size: number): void {
       if (!Number.isFinite(size)) {
         return;
@@ -106,6 +109,13 @@ export const BuilderStore = signalStore(
       patchState(store, ({ canvasElements }) => ({
         canvasElements: canvasElements.map((element) =>
           element.uid === uid && 'text' in element ? { ...element, text } : element,
+        ),
+      }));
+    },
+    updateOptions(uid: string, options: DropdownOption[]): void {
+      patchState(store, ({ canvasElements }) => ({
+        canvasElements: canvasElements.map((element) =>
+          element.uid === uid && element.type === 'dropdown' ? { ...element, options } : element,
         ),
       }));
     },

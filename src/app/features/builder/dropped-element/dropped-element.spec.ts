@@ -1,7 +1,13 @@
 import { Dialog } from '@angular/cdk/dialog';
 import { TestBed } from '@angular/core/testing';
 import { Observable, of } from 'rxjs';
-import { CanvasElement, DatepickerCanvasElement, TextCanvasElement } from '../models/canvas-element';
+import { DropdownOption } from '../../../shared/dropdown-options-dialog/dropdown-option';
+import {
+  CanvasElement,
+  DatepickerCanvasElement,
+  DropdownCanvasElement,
+  TextCanvasElement,
+} from '../models/canvas-element';
 import { BuilderStore } from '../state/builder-store';
 import { DroppedElement } from './dropped-element';
 
@@ -17,12 +23,24 @@ describe('DroppedElement', () => {
     paletteUid: 'palette-datepicker',
     ...cell,
   };
+  const options: DropdownOption[] = [{ text: 'Small', value: 's' }];
+  const dropdown: DropdownCanvasElement = {
+    uid: 'element-3',
+    type: 'dropdown',
+    paletteUid: 'palette-dropdown',
+    options,
+    ...cell,
+  };
 
-  let store: { updateText: ReturnType<typeof vi.fn>; removeElement: ReturnType<typeof vi.fn> };
-  let dialogResult: Observable<string | true | undefined>;
+  let store: {
+    updateText: ReturnType<typeof vi.fn>;
+    updateOptions: ReturnType<typeof vi.fn>;
+    removeElement: ReturnType<typeof vi.fn>;
+  };
+  let dialogResult: Observable<string | true | DropdownOption[] | undefined>;
 
   beforeEach(() => {
-    store = { updateText: vi.fn(), removeElement: vi.fn() };
+    store = { updateText: vi.fn(), updateOptions: vi.fn(), removeElement: vi.fn() };
     dialogResult = of(undefined);
     TestBed.configureTestingModule({
       providers: [
@@ -55,6 +73,14 @@ describe('DroppedElement', () => {
       expect(classes).not.toContain('hover:border-primary/40');
     });
 
+    it('gives a dropdown a dashed accent hover outline', () => {
+      const classes = (create(dropdown).nativeElement as HTMLElement).classList;
+
+      expect(classes).toContain('border-dashed');
+      expect(classes).toContain('hover:border-accent');
+      expect(classes).not.toContain('hover:border-primary/40');
+    });
+
     it.each([textInput, textfield, datepicker])('gives a $type a dashed info hover outline', (element) => {
       const classes = (create(element).nativeElement as HTMLElement).classList;
 
@@ -83,6 +109,27 @@ describe('DroppedElement', () => {
       create(div).componentInstance['editText'](div);
 
       expect(store.updateText).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('editOptions', () => {
+    const saved: DropdownOption[] = [
+      { text: 'Medium', value: 'm' },
+      { text: 'Large', value: 'l' },
+    ];
+
+    it('stores the options the user saved', () => {
+      dialogResult = of(saved);
+
+      create(dropdown).componentInstance['editOptions'](dropdown);
+
+      expect(store.updateOptions).toHaveBeenCalledWith(dropdown.uid, saved);
+    });
+
+    it('leaves the options unchanged when the user cancels', () => {
+      create(dropdown).componentInstance['editOptions'](dropdown);
+
+      expect(store.updateOptions).not.toHaveBeenCalled();
     });
   });
 

@@ -50,6 +50,37 @@ test('edits the text of a dropped element through its actions menu', async ({ pa
   await expect(canvas.getByTestId('dropped-div')).toHaveCount(1);
 });
 
+test('edits the options of a dropped dropdown through its actions menu', async ({ page }) => {
+  await page.goto('/');
+  const palette = page.getByRole('complementary', { name: 'Sidebar' });
+  const canvas = page.getByRole('region', { name: 'Canvas' });
+
+  await drag(page, palette.getByRole('listitem').filter({ hasText: 'Dropdown' }), canvas);
+  const select = canvas.getByRole('combobox', { name: 'Dropdown' });
+  await expect(select).toHaveCount(1);
+  await expect(select.getByRole('option')).toHaveCount(0);
+
+  await canvas.getByRole('button', { name: 'Element actions' }).click();
+  await page.getByRole('menuitem', { name: 'Edit options' }).click();
+
+  const dialog = page.getByRole('dialog', { name: 'Edit options' });
+  await dialog.getByRole('textbox', { name: 'Option 1 text' }).fill('Small');
+  await dialog.getByRole('textbox', { name: 'Option 1 value' }).fill('s');
+  await dialog.getByRole('button', { name: 'Add option' }).click();
+  await dialog.getByRole('textbox', { name: 'Option 2 text' }).fill('Large');
+  await dialog.getByRole('textbox', { name: 'Option 2 value' }).fill('l');
+  await dialog.getByRole('button', { name: 'Save' }).click();
+
+  await expect(dialog).toBeHidden();
+  await expect(select.getByRole('option')).toHaveText(['Small', 'Large']);
+  await select.selectOption({ label: 'Large' });
+  await expect(select).toHaveValue('l');
+
+  await canvas.getByRole('button', { name: 'Element actions' }).click();
+  await page.getByRole('menuitem', { name: 'Edit options' }).click();
+  await expect(dialog.getByRole('textbox', { name: 'Option 2 text' })).toHaveValue('Large');
+});
+
 test('deletes a dropped element through its actions menu after confirming', async ({ page }) => {
   await page.goto('/');
   const palette = page.getByRole('complementary', { name: 'Sidebar' });

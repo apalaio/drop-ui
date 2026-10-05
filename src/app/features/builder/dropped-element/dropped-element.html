@@ -32,6 +32,13 @@
         <button type="button" cdkMenuItem (cdkMenuItemTriggered)="editText(el)">Edit text</button>
       </li>
     }
+    @if (el.type === 'dropdown') {
+      <li role="none">
+        <button type="button" cdkMenuItem (cdkMenuItemTriggered)="editOptions(el)">
+          Edit options
+        </button>
+      </li>
+    }
     <li role="none">
       <button type="button" class="text-error" cdkMenuItem (cdkMenuItemTriggered)="deleteElement()">
         Delete element
@@ -81,6 +88,19 @@
       (mousedown)="$event.stopPropagation()"
       (touchstart)="$event.stopPropagation()"
     />
+  }
+  @case ('dropdown') {
+    <select
+      class="select"
+      aria-label="Dropdown"
+      data-testid="dropped-dropdown"
+      (mousedown)="$event.stopPropagation()"
+      (touchstart)="$event.stopPropagation()"
+    >
+      @for (option of el.options; track $index) {
+        <option [value]="option.value">{{ option.text }}</option>
+      }
+    </select>
   }
   @default never(el);
 }

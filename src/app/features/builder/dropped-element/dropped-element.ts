@@ -2,8 +2,9 @@ import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { Component, computed, inject, input } from '@angular/core';
 import { openConfirmationDialog } from '../../../shared/confirmation-dialog/confirmation-dialog';
+import { openDropDownOptionsDialog } from '../../../shared/dropdown-options-dialog/dropdown-options-dialog';
 import { openTextInputDialog } from '../../../shared/text-input-dialog/text-input-dialog';
-import { CanvasElement, TextCanvasElement } from '../models/canvas-element';
+import { CanvasElement, DropdownCanvasElement, TextCanvasElement } from '../models/canvas-element';
 import { ElementType } from '../models/palette-item';
 import { BuilderStore } from '../state/builder-store';
 
@@ -13,6 +14,7 @@ const HOVER_OUTLINE: Record<ElementType, string> = {
   'text-input': 'border-dashed hover:border-info',
   textfield: 'border-dashed hover:border-info',
   datepicker: 'border-dashed hover:border-info',
+  dropdown: 'border-dashed hover:border-accent',
 };
 
 @Component({
@@ -42,6 +44,18 @@ export class DroppedElement {
     }).subscribe((newText) => {
       if (newText !== undefined) {
         this.store.updateText(uid, newText);
+      }
+    });
+  }
+
+  protected editOptions({ uid, type, options }: DropdownCanvasElement): void {
+    openDropDownOptionsDialog(this.dialog, {
+      title: 'Edit options',
+      subtitle: `Set the text and value of each option in this <${type}>.`,
+      options,
+    }).subscribe((newOptions) => {
+      if (newOptions !== undefined) {
+        this.store.updateOptions(uid, newOptions);
       }
     });
   }

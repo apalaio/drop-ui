@@ -13,7 +13,16 @@ describe(DroppedElement.name, () => {
   const datepicker: CanvasElement = { uid: 'element-6', type: 'datepicker', paletteUid: 'palette-datepicker', ...cell };
   const formControlTestIds = ['dropped-text-input', 'dropped-textfield', 'dropped-datepicker'];
   const otherTestIds = (testId: string) =>
-    ['dropped-div', 'dropped-span', ...formControlTestIds].filter((other) => other !== testId);
+    ['dropped-div', 'dropped-span', 'dropped-dropdown', ...formControlTestIds].filter((other) => other !== testId);
+  const small = { text: 'Small', value: 's' };
+  const large = { text: 'Large', value: 'l' };
+  const dropdown: CanvasElement = {
+    uid: 'element-3',
+    type: 'dropdown',
+    paletteUid: 'palette-dropdown',
+    options: [small, large],
+    ...cell,
+  };
 
   async function mount(element: CanvasElement) {
     return render(DroppedElement, { inputs: { element } });
@@ -45,6 +54,10 @@ describe(DroppedElement.name, () => {
     it('should not render a span', () => {
       expect(screen.queryByTestId('dropped-span')).not.toBeInTheDocument();
     });
+
+    it('should not render a dropdown', () => {
+      expect(screen.queryByTestId('dropped-dropdown')).not.toBeInTheDocument();
+    });
   });
 
   describe('span element', () => {
@@ -60,6 +73,10 @@ describe(DroppedElement.name, () => {
 
     it('should not render a div', () => {
       expect(screen.queryByTestId('dropped-div')).not.toBeInTheDocument();
+    });
+
+    it('should not render a dropdown', () => {
+      expect(screen.queryByTestId('dropped-dropdown')).not.toBeInTheDocument();
     });
   });
 
@@ -107,6 +124,47 @@ describe(DroppedElement.name, () => {
     });
   });
 
+  describe('dropdown element', () => {
+    describe('with options', () => {
+      beforeEach(async () => mount(dropdown));
+
+      it('should render a select', () => {
+        expect(screen.getByTestId('dropped-dropdown')).toBe(screen.getByRole('combobox', { name: 'Dropdown' }));
+      });
+
+      it('should render one option per element option, in order', () => {
+        const labels = screen.getAllByRole('option').map((option) => option.textContent?.trim());
+
+        expect(labels).toEqual([small.text, large.text]);
+      });
+
+      it('should give each option its value', () => {
+        expect(screen.getByRole('option', { name: large.text })).toHaveValue(large.value);
+      });
+
+      it.each(formControlTestIds)('should not render %s', (testId) => {
+        expect(screen.queryByTestId(testId)).not.toBeInTheDocument();
+      });
+
+      it('should not render a div', () => {
+        expect(screen.queryByTestId('dropped-div')).not.toBeInTheDocument();
+      });
+
+      it('should not render a span', () => {
+        expect(screen.queryByTestId('dropped-span')).not.toBeInTheDocument();
+      });
+    });
+
+    describe('without options', () => {
+      beforeEach(async () => mount({ ...dropdown, options: [] }));
+
+      it('should render a select with no options', () => {
+        expect(screen.getByRole('combobox', { name: 'Dropdown' })).toBeInTheDocument();
+        expect(screen.queryAllByRole('option').length).toBe(0);
+      });
+    });
+  });
+
   describe('actions menu of a datepicker', () => {
     beforeEach(async () => mount(datepicker));
 
@@ -117,6 +175,32 @@ describe(DroppedElement.name, () => {
       const actions = screen.getAllByRole('menuitem').map((item) => item.textContent?.trim());
 
       expect(actions).toEqual(['Delete element']);
+    });
+  });
+
+  describe('actions menu of a dropdown', () => {
+    beforeEach(async () => mount(dropdown));
+
+    it('should list edit options then delete element, without edit text', async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Element actions' }));
+
+      await screen.findByRole('menu');
+      const actions = screen.getAllByRole('menuitem').map((item) => item.textContent?.trim());
+
+      expect(actions).toEqual(['Edit options', 'Delete element']);
+    });
+
+    it('should open the edit options dialog, prefilled with the element options, from the edit options action', async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Element actions' }));
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Edit options' }));
+
+      const dialog = await screen.findByRole('dialog', { name: 'Edit options' });
+
+      expect(dialog).toBeInTheDocument();
+      expect(screen.getByRole('textbox', { name: 'Option 1 text' })).toHaveValue(small.text);
+      expect(screen.getByRole('textbox', { name: 'Option 1 value' })).toHaveValue(small.value);
+      expect(screen.getByRole('textbox', { name: 'Option 2 text' })).toHaveValue(large.text);
+      expect(screen.getByRole('textbox', { name: 'Option 2 value' })).toHaveValue(large.value);
     });
   });
 

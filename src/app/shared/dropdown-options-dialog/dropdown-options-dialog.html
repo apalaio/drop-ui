@@ -1,0 +1,54 @@
+<form class="flex flex-col gap-4" [formRoot]="optionsForm">
+  <h2 class="text-lg font-semibold">{{ title() }}</h2>
+
+  @if (subtitle()) {
+    <p class="text-sm text-base-content/70" data-testid="dialog-subtitle">{{ subtitle() }}</p>
+  }
+
+  <ul class="-m-1 flex max-h-[50vh] flex-col gap-2 overflow-y-auto p-1">
+    @for (option of optionsForm.options; track option; let index = $index) {
+      <li class="flex items-center gap-2">
+        <label class="input min-w-0 flex-1">
+          <span class="sr-only">Option {{ index + 1 }} text</span>
+          <input #textInput type="text" class="grow" placeholder="Text" [formField]="option.text" />
+        </label>
+        <label class="input min-w-0 flex-1">
+          <span class="sr-only">Option {{ index + 1 }} value</span>
+          <input type="text" class="grow" placeholder="Value" [formField]="option.value" />
+        </label>
+        <button
+          type="button"
+          class="btn btn-ghost btn-square enabled:text-error"
+          [attr.aria-label]="'Delete option ' + (index + 1)"
+          [disabled]="$first"
+          (click)="removeOption(index)"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            class="size-4"
+            aria-hidden="true"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M4 7h16M10 11v6M14 11v6M6 7l1 12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-12M9 7V4h6v3"
+            />
+          </svg>
+        </button>
+      </li>
+    }
+  </ul>
+
+  <div>
+    <button type="button" class="btn btn-sm" (click)="addOption()">Add option</button>
+  </div>
+
+  <div class="flex justify-end gap-2">
+    <button type="button" class="btn btn-ghost" (click)="cancel()">Cancel</button>
+    <button type="submit" class="btn btn-primary" [disabled]="optionsForm().invalid()">Save</button>
+  </div>
+</form>

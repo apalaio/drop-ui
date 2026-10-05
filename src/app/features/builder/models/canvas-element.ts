@@ -1,3 +1,4 @@
+import { DropdownOption } from '../../../shared/dropdown-options-dialog/dropdown-option';
 import { ElementType } from './palette-item';
 
 /** An element instance placed on the canvas. Its position among the elements of its cell is its order in that cell. */
@@ -19,4 +20,8 @@ export interface TextCanvasElement extends BaseCanvasElement<
 
 export interface DatepickerCanvasElement extends BaseCanvasElement<'datepicker'> {}
 
-export type CanvasElement = TextCanvasElement | DatepickerCanvasElement;
+export interface DropdownCanvasElement extends BaseCanvasElement<'dropdown'> {
+  options: DropdownOption[];
+}
+
+export type CanvasElement = TextCanvasElement | DatepickerCanvasElement | DropdownCanvasElement;

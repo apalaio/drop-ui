@@ -35,6 +35,7 @@ describe('BuilderStore', () => {
       'text-input',
       'textfield',
       'datepicker',
+      'dropdown',
     ]);
   });
 
@@ -253,14 +254,25 @@ describe('BuilderStore', () => {
       addOfType(store, type);
 
       expect(store.canvasElements()).toEqual([expect.objectContaining({ type, text: DEFAULT_ELEMENT_TEXT })]);
+      expect(store.canvasElements()[0]).not.toHaveProperty('options');
     });
 
-    it('starts a datepicker with no text', () => {
+    it('starts a datepicker with neither text nor options', () => {
       const store = TestBed.inject(BuilderStore);
 
       addOfType(store, 'datepicker');
 
       expect(store.canvasElements()[0]).toMatchObject({ type: 'datepicker' });
+      expect(store.canvasElements()[0]).not.toHaveProperty('text');
+      expect(store.canvasElements()[0]).not.toHaveProperty('options');
+    });
+
+    it('starts a dropdown with an empty list of options and no text', () => {
+      const store = TestBed.inject(BuilderStore);
+
+      addOfType(store, 'dropdown');
+
+      expect(store.canvasElements()[0]).toMatchObject({ type: 'dropdown', options: [] });
       expect(store.canvasElements()[0]).not.toHaveProperty('text');
     });
 
@@ -304,7 +316,7 @@ describe('BuilderStore', () => {
       expect(store.cells()[0].elements).toEqual([first, { ...second, text: 'Hello' }]);
     });
 
-    it.each(['datepicker'] as const)('leaves a %s, which has no text, as it was', (type) => {
+    it.each(['datepicker', 'dropdown'] as const)('leaves a %s, which has no text, as it was', (type) => {
       const store = TestBed.inject(BuilderStore);
       const uid = addOfType(store, type);
       const before = store.canvasElements();
@@ -312,6 +324,56 @@ describe('BuilderStore', () => {
       store.updateText(uid, 'Hello');
 
       expect(store.canvasElements()).toEqual(before);
+    });
+  });
+
+  describe('updateOptions', () => {
+    const options = [
+      { text: 'Small', value: 's' },
+      { text: 'Large', value: 'l' },
+    ];
+
+    it('changes the options of the matching element only', () => {
+      const store = TestBed.inject(BuilderStore);
+      const [first, second] = [addOfType(store, 'dropdown'), addOfType(store, 'dropdown')];
+
+      store.updateOptions(second, options);
+
+      expect(store.canvasElements()).toEqual([
+        expect.objectContaining({ uid: first, options: [] }),
+        expect.objectContaining({ uid: second, options }),
+      ]);
+    });
+
+    it('replaces the options saved earlier', () => {
+      const store = TestBed.inject(BuilderStore);
+      const uid = addOfType(store, 'dropdown');
+      store.updateOptions(uid, options);
+
+      store.updateOptions(uid, [options[1]]);
+
+      expect(store.canvasElements()[0]).toMatchObject({ options: [options[1]] });
+    });
+
+    it.each(['div', 'datepicker'] as const)('leaves a %s, which is not a dropdown, as it was', (type) => {
+      const store = TestBed.inject(BuilderStore);
+      const uid = addOfType(store, type);
+      const before = store.canvasElements();
+
+      store.updateOptions(uid, options);
+
+      expect(store.canvasElements()).toEqual(before);
+    });
+
+    it('keeps the options of a dropdown moved to another cell', () => {
+      const store = TestBed.inject(BuilderStore);
+      store.setGridSize('columns', 2);
+      const uid = addOfType(store, 'dropdown');
+      store.updateOptions(uid, options);
+
+      store.moveElement(uid, { row: 0, column: 1 }, 0);
+
+      expect(store.canvasElements()).toEqual([expect.objectContaining({ uid, options, row: 0, column: 1 })]);
     });
   });
 
