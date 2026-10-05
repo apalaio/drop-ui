@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { MAX_GRID_SIZE, MIN_GRID_SIZE } from '../models/grid-layout';
+import { ElementType } from '../models/palette-item';
 import { BuilderStore, DEFAULT_ELEMENT_TEXT } from './builder-store';
 
 type Store = InstanceType<typeof BuilderStore>;
@@ -18,10 +19,23 @@ describe('BuilderStore', () => {
     return uidsIn(store, row, column)[index];
   }
 
-  it('provides div and span palette items', () => {
+  function addOfType(store: Store, type: ElementType): string {
+    const item = store.paletteItems().find((candidate) => candidate.type === type)!;
+    const index = uidsIn(store, 0, 0).length;
+    store.addElement(item, origin, index);
+    return uidsIn(store, 0, 0)[index];
+  }
+
+  it('provides a palette item per element type', () => {
     const store = TestBed.inject(BuilderStore);
 
-    expect(store.paletteItems().map((item) => item.type)).toEqual(['div', 'span']);
+    expect(store.paletteItems().map((item) => item.type)).toEqual([
+      'div',
+      'span',
+      'text-input',
+      'textfield',
+      'datepicker',
+    ]);
   });
 
   it('gives every palette item a unique uid', () => {
@@ -233,12 +247,21 @@ describe('BuilderStore', () => {
       expect(uidsIn(store, 0, 0)).toEqual([first, middle, last]);
     });
 
-    it('starts the element with the default text', () => {
+    it.each(['div', 'span', 'text-input', 'textfield'] as const)('starts a %s with the default text', (type) => {
       const store = TestBed.inject(BuilderStore);
 
-      store.addElement(store.paletteItems()[0], origin, 0);
+      addOfType(store, type);
 
-      expect(store.canvasElements()[0].text).toBe(DEFAULT_ELEMENT_TEXT);
+      expect(store.canvasElements()).toEqual([expect.objectContaining({ type, text: DEFAULT_ELEMENT_TEXT })]);
+    });
+
+    it('starts a datepicker with no text', () => {
+      const store = TestBed.inject(BuilderStore);
+
+      addOfType(store, 'datepicker');
+
+      expect(store.canvasElements()[0]).toMatchObject({ type: 'datepicker' });
+      expect(store.canvasElements()[0]).not.toHaveProperty('text');
     });
 
     it('places the element in the cell it was dropped in', () => {
@@ -278,7 +301,17 @@ describe('BuilderStore', () => {
 
       store.updateText(second.uid, 'Hello');
 
-      expect(store.cells()[0].elements.map((element) => element.text)).toEqual([first.text, 'Hello']);
+      expect(store.cells()[0].elements).toEqual([first, { ...second, text: 'Hello' }]);
+    });
+
+    it.each(['datepicker'] as const)('leaves a %s, which has no text, as it was', (type) => {
+      const store = TestBed.inject(BuilderStore);
+      const uid = addOfType(store, type);
+      const before = store.canvasElements();
+
+      store.updateText(uid, 'Hello');
+
+      expect(store.canvasElements()).toEqual(before);
     });
   });
 

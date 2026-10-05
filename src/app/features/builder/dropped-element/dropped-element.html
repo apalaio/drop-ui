@@ -1,5 +1,7 @@
+@let el = element();
+
 <span class="badge badge-ghost badge-xs absolute top-2 right-10 opacity-0 group-hover:opacity-100">
-  {{ element().type }}
+  {{ el.type }}
 </span>
 
 <button
@@ -25,9 +27,11 @@
 
 <ng-template #actions>
   <ul cdkMenu class="menu w-36 rounded-box bg-base-100 p-1 shadow-md">
-    <li role="none">
-      <button type="button" cdkMenuItem (cdkMenuItemTriggered)="editText()">Edit text</button>
-    </li>
+    @if ('text' in el) {
+      <li role="none">
+        <button type="button" cdkMenuItem (cdkMenuItemTriggered)="editText(el)">Edit text</button>
+      </li>
+    }
     <li role="none">
       <button type="button" class="text-error" cdkMenuItem (cdkMenuItemTriggered)="deleteElement()">
         Delete element
@@ -36,15 +40,47 @@
   </ul>
 </ng-template>
 
-@switch (element().type) {
+@switch (el.type) {
   @case ('div') {
     <div class="min-h-16 rounded-field bg-base-200 p-2" data-testid="dropped-div">
-      {{ element().text }}
+      {{ el.text }}
     </div>
   }
   @case ('span') {
     <span class="rounded-field bg-base-200 px-2 py-1" data-testid="dropped-span">{{
-      element().text
+      el.text
     }}</span>
   }
+  @case ('text-input') {
+    <input
+      type="text"
+      class="input"
+      aria-label="Text input"
+      data-testid="dropped-text-input"
+      [placeholder]="el.text"
+      (mousedown)="$event.stopPropagation()"
+      (touchstart)="$event.stopPropagation()"
+    />
+  }
+  @case ('textfield') {
+    <textarea
+      class="textarea"
+      aria-label="Textfield"
+      data-testid="dropped-textfield"
+      [placeholder]="el.text"
+      (mousedown)="$event.stopPropagation()"
+      (touchstart)="$event.stopPropagation()"
+    ></textarea>
+  }
+  @case ('datepicker') {
+    <input
+      type="date"
+      class="input"
+      aria-label="Datepicker"
+      data-testid="dropped-datepicker"
+      (mousedown)="$event.stopPropagation()"
+      (touchstart)="$event.stopPropagation()"
+    />
+  }
+  @default never(el);
 }

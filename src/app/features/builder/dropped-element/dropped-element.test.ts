@@ -8,6 +8,12 @@ describe(DroppedElement.name, () => {
   const cell = { row: 0, column: 0 };
   const div: CanvasElement = { uid, type: 'div', paletteUid: 'palette-div', text, ...cell };
   const span: CanvasElement = { uid: 'element-2', type: 'span', paletteUid: 'palette-span', text, ...cell };
+  const textInput: CanvasElement = { ...div, uid: 'element-4', type: 'text-input', paletteUid: 'palette-text-input' };
+  const textfield: CanvasElement = { ...div, uid: 'element-5', type: 'textfield', paletteUid: 'palette-textfield' };
+  const datepicker: CanvasElement = { uid: 'element-6', type: 'datepicker', paletteUid: 'palette-datepicker', ...cell };
+  const formControlTestIds = ['dropped-text-input', 'dropped-textfield', 'dropped-datepicker'];
+  const otherTestIds = (testId: string) =>
+    ['dropped-div', 'dropped-span', ...formControlTestIds].filter((other) => other !== testId);
 
   async function mount(element: CanvasElement) {
     return render(DroppedElement, { inputs: { element } });
@@ -32,6 +38,10 @@ describe(DroppedElement.name, () => {
       expect(screen.getByTestId('dropped-div')).toHaveTextContent(text);
     });
 
+    it.each(formControlTestIds)('should not render %s', (testId) => {
+      expect(screen.queryByTestId(testId)).not.toBeInTheDocument();
+    });
+
     it('should not render a span', () => {
       expect(screen.queryByTestId('dropped-span')).not.toBeInTheDocument();
     });
@@ -44,8 +54,69 @@ describe(DroppedElement.name, () => {
       expect(screen.getByTestId('dropped-span')).toHaveTextContent(text);
     });
 
+    it.each(formControlTestIds)('should not render %s', (testId) => {
+      expect(screen.queryByTestId(testId)).not.toBeInTheDocument();
+    });
+
     it('should not render a div', () => {
       expect(screen.queryByTestId('dropped-div')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('text input element', () => {
+    beforeEach(async () => mount(textInput));
+
+    it('should render a single-line text input', () => {
+      expect(screen.getByTestId('dropped-text-input')).toBe(screen.getByRole('textbox', { name: 'Text input' }));
+    });
+
+    it('should show the element text as the placeholder', () => {
+      expect(screen.getByRole('textbox', { name: 'Text input' })).toHaveAttribute('placeholder', text);
+    });
+
+    it.each(otherTestIds('dropped-text-input'))('should not render %s', (testId) => {
+      expect(screen.queryByTestId(testId)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('textfield element', () => {
+    beforeEach(async () => mount(textfield));
+
+    it('should render a multi-line textarea', () => {
+      expect(screen.getByRole('textbox', { name: 'Textfield' })).toBeInstanceOf(HTMLTextAreaElement);
+    });
+
+    it('should show the element text as the placeholder', () => {
+      expect(screen.getByTestId('dropped-textfield')).toHaveAttribute('placeholder', text);
+    });
+
+    it.each(otherTestIds('dropped-textfield'))('should not render %s', (testId) => {
+      expect(screen.queryByTestId(testId)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('datepicker element', () => {
+    beforeEach(async () => mount(datepicker));
+
+    it('should render a native date input', () => {
+      expect(screen.getByLabelText('Datepicker')).toHaveAttribute('type', 'date');
+    });
+
+    it.each(otherTestIds('dropped-datepicker'))('should not render %s', (testId) => {
+      expect(screen.queryByTestId(testId)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('actions menu of a datepicker', () => {
+    beforeEach(async () => mount(datepicker));
+
+    it('should not offer edit text, as a date input shows no text', async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Element actions' }));
+
+      await screen.findByRole('menu');
+      const actions = screen.getAllByRole('menuitem').map((item) => item.textContent?.trim());
+
+      expect(actions).toEqual(['Delete element']);
     });
   });
 

@@ -25,10 +25,29 @@ const createInitialState = (): BuilderState => ({
   paletteItems: [
     { uid: crypto.randomUUID(), type: 'div', label: 'Div' },
     { uid: crypto.randomUUID(), type: 'span', label: 'Span' },
+    { uid: crypto.randomUUID(), type: 'text-input', label: 'Text input' },
+    { uid: crypto.randomUUID(), type: 'textfield', label: 'Textfield' },
+    { uid: crypto.randomUUID(), type: 'datepicker', label: 'Datepicker' },
   ],
   grid: { rows: 1, columns: 1 },
   canvasElements: [],
 });
+
+const createElement = (
+  { uid: paletteUid, type }: PaletteItem,
+  { row, column }: CellPosition,
+): CanvasElement => {
+  const base = { uid: crypto.randomUUID(), paletteUid, row, column };
+  switch (type) {
+    case 'div':
+    case 'span':
+    case 'text-input':
+    case 'textfield':
+      return { ...base, type, text: DEFAULT_ELEMENT_TEXT };
+    case 'datepicker':
+      return { ...base, type };
+  }
+};
 
 const CELL_AXIS: Record<GridAxis, keyof CellPosition> = { rows: 'row', columns: 'column' };
 
@@ -78,14 +97,7 @@ export const BuilderStore = signalStore(
       }));
     },
     addElement(item: PaletteItem, cell: CellPosition, index: number): void {
-      const element: CanvasElement = {
-        uid: crypto.randomUUID(),
-        type: item.type,
-        paletteUid: item.uid,
-        text: DEFAULT_ELEMENT_TEXT,
-        row: cell.row,
-        column: cell.column,
-      };
+      const element = createElement(item, cell);
       patchState(store, ({ canvasElements }) => ({
         canvasElements: insertIntoCell(canvasElements, element, index),
       }));
@@ -93,7 +105,7 @@ export const BuilderStore = signalStore(
     updateText(uid: string, text: string): void {
       patchState(store, ({ canvasElements }) => ({
         canvasElements: canvasElements.map((element) =>
-          element.uid === uid ? { ...element, text } : element,
+          element.uid === uid && 'text' in element ? { ...element, text } : element,
         ),
       }));
     },

@@ -3,13 +3,16 @@ import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { Component, computed, inject, input } from '@angular/core';
 import { openConfirmationDialog } from '../../../shared/confirmation-dialog/confirmation-dialog';
 import { openTextInputDialog } from '../../../shared/text-input-dialog/text-input-dialog';
-import { CanvasElement } from '../models/canvas-element';
+import { CanvasElement, TextCanvasElement } from '../models/canvas-element';
 import { ElementType } from '../models/palette-item';
 import { BuilderStore } from '../state/builder-store';
 
 const HOVER_OUTLINE: Record<ElementType, string> = {
   div: 'border-dashed hover:border-primary/40',
   span: 'border-dotted hover:border-secondary',
+  'text-input': 'border-dashed hover:border-info',
+  textfield: 'border-dashed hover:border-info',
+  datepicker: 'border-dashed hover:border-info',
 };
 
 @Component({
@@ -31,11 +34,10 @@ export class DroppedElement {
   private readonly store = inject(BuilderStore);
   private readonly dialog = inject(Dialog);
 
-  protected editText(): void {
-    const { uid, text } = this.element();
+  protected editText({ uid, type, text }: TextCanvasElement): void {
     openTextInputDialog(this.dialog, {
       title: 'Edit text',
-      description: `Change the text shown inside this <${this.element().type}>.`,
+      description: `Change the text shown inside this <${type}>.`,
       value: text,
     }).subscribe((newText) => {
       if (newText !== undefined) {

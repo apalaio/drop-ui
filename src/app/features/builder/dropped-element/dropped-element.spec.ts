@@ -1,14 +1,22 @@
 import { Dialog } from '@angular/cdk/dialog';
 import { TestBed } from '@angular/core/testing';
 import { Observable, of } from 'rxjs';
-import { CanvasElement } from '../models/canvas-element';
+import { CanvasElement, DatepickerCanvasElement, TextCanvasElement } from '../models/canvas-element';
 import { BuilderStore } from '../state/builder-store';
 import { DroppedElement } from './dropped-element';
 
 describe('DroppedElement', () => {
   const cell = { row: 0, column: 0 };
-  const div: CanvasElement = { uid: 'element-1', type: 'div', paletteUid: 'palette-div', text: 'enter text', ...cell };
-  const span: CanvasElement = { ...div, uid: 'element-2', type: 'span', paletteUid: 'palette-span' };
+  const div: TextCanvasElement = { uid: 'element-1', type: 'div', paletteUid: 'palette-div', text: 'enter text', ...cell };
+  const span: TextCanvasElement = { ...div, uid: 'element-2', type: 'span', paletteUid: 'palette-span' };
+  const textInput: TextCanvasElement = { ...div, uid: 'element-4', type: 'text-input', paletteUid: 'palette-text-input' };
+  const textfield: TextCanvasElement = { ...div, uid: 'element-5', type: 'textfield', paletteUid: 'palette-textfield' };
+  const datepicker: DatepickerCanvasElement = {
+    uid: 'element-6',
+    type: 'datepicker',
+    paletteUid: 'palette-datepicker',
+    ...cell,
+  };
 
   let store: { updateText: ReturnType<typeof vi.fn>; removeElement: ReturnType<typeof vi.fn> };
   let dialogResult: Observable<string | true | undefined>;
@@ -47,6 +55,14 @@ describe('DroppedElement', () => {
       expect(classes).not.toContain('hover:border-primary/40');
     });
 
+    it.each([textInput, textfield, datepicker])('gives a $type a dashed info hover outline', (element) => {
+      const classes = (create(element).nativeElement as HTMLElement).classList;
+
+      expect(classes).toContain('border-dashed');
+      expect(classes).toContain('hover:border-info');
+      expect(classes).not.toContain('hover:border-primary/40');
+    });
+
     it('keeps the static wrapper classes alongside the hover outline', () => {
       const classes = (create(div).nativeElement as HTMLElement).classList;
 
@@ -58,13 +74,13 @@ describe('DroppedElement', () => {
     it('stores the text the user saved', () => {
       dialogResult = of('Hello');
 
-      create(div).componentInstance['editText']();
+      create(div).componentInstance['editText'](div);
 
       expect(store.updateText).toHaveBeenCalledWith(div.uid, 'Hello');
     });
 
     it('leaves the text unchanged when the user cancels', () => {
-      create(div).componentInstance['editText']();
+      create(div).componentInstance['editText'](div);
 
       expect(store.updateText).not.toHaveBeenCalled();
     });
