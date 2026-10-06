@@ -8,6 +8,10 @@ export interface CellPosition {
   column: number;
 }
 
+/** One-based, the way the user counts rows and columns. */
+export const cellLabel = ({ row, column }: CellPosition): string =>
+  `Row ${row + 1}, column ${column + 1}`;
+
 export interface GridLayout {
   rows: number;
   columns: number;

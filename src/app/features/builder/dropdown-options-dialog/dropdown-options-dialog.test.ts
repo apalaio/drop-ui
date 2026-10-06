@@ -5,6 +5,7 @@ import { DropdownOption } from '../models/dropdown-option';
 import { DropdownOptionsDialog, openDropdownOptionsDialog } from './dropdown-options-dialog';
 
 const title = 'Dropdown options';
+const description = 'Add the options of this dropdown.';
 const cancelled = 'cancelled';
 const small: DropdownOption = { text: 'Small', value: 's' };
 const large: DropdownOption = { text: 'Large', value: 'l' };
@@ -21,15 +22,13 @@ class DialogHost {
   protected readonly result = signal('');
 
   protected open(): void {
-    openDropdownOptionsDialog(this.dialog, { title, options: [small] }).subscribe((options) =>
-      this.result.set(options ? JSON.stringify(options) : cancelled),
+    openDropdownOptionsDialog(this.dialog, { title, description, options: [small] }).subscribe(
+      (options) => this.result.set(options ? JSON.stringify(options) : cancelled),
     );
   }
 }
 
 describe(DropdownOptionsDialog.name, () => {
-  const description = 'Add the options of this dropdown.';
-
   async function mount(inputs: { description?: string; options?: DropdownOption[] } = {}) {
     return render(DropdownOptionsDialog, {
       inputs: { title, ...inputs },
@@ -165,6 +164,10 @@ describe(DropdownOptionsDialog.name, () => {
       await render(DialogHost);
       fireEvent.click(screen.getByRole('button', { name: 'Open' }));
       await screen.findByRole('dialog', { name: title });
+    });
+
+    it('should be described by its description', () => {
+      expect(screen.getByRole('dialog')).toHaveAccessibleDescription(description);
     });
 
     it('should focus the text input of the first row', async () => {

@@ -29,6 +29,20 @@ test('drops a div and a span from the palette onto the canvas', async ({ page })
   expect(types.sort()).toEqual(['div', 'span']);
 });
 
+test('still drops and reorders elements when reduced motion is requested', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/');
+  const palette = page.getByRole('complementary', { name: 'Sidebar' });
+  const canvas = page.getByRole('region', { name: 'Canvas' });
+
+  await drag(page, palette.getByRole('listitem').filter({ hasText: 'Div' }), canvas);
+  await expect(canvas.getByTestId('dropped-div')).toHaveCount(1);
+  await drag(page, palette.getByRole('listitem').filter({ hasText: 'Dropdown' }), canvas.getByTestId('dropped-div'));
+
+  await expect(canvas.getByTestId('dropped-dropdown')).toHaveCount(1);
+  await expect(canvas.locator('[data-element-type]')).toHaveCount(2);
+});
+
 test('lays dropped spans out next to each other and a div on a line of its own', async ({ page }) => {
   await page.goto('/');
   const palette = page.getByRole('complementary', { name: 'Sidebar' });
@@ -63,7 +77,7 @@ test('edits the text of a dropped element through its actions menu', async ({ pa
   const div = canvas.getByTestId('dropped-div');
   await expect(div).toHaveText('enter text');
 
-  await canvas.getByRole('button', { name: 'Element actions' }).click();
+  await canvas.getByRole('button', { name: 'Block text actions' }).click();
   await page.getByRole('menuitem', { name: 'Edit text' }).click();
 
   const dialog = page.getByRole('dialog', { name: 'Edit text' });
@@ -85,7 +99,7 @@ test('edits the options of a dropped dropdown through its actions menu', async (
   await expect(select).toHaveCount(1);
   await expect(select.getByRole('option')).toHaveCount(0);
 
-  await canvas.getByRole('button', { name: 'Element actions' }).click();
+  await canvas.getByRole('button', { name: 'Dropdown actions' }).click();
   await page.getByRole('menuitem', { name: 'Edit options' }).click();
 
   const dialog = page.getByRole('dialog', { name: 'Edit options' });
@@ -101,7 +115,7 @@ test('edits the options of a dropped dropdown through its actions menu', async (
   await select.selectOption({ label: 'Large' });
   await expect(select).toHaveValue('l');
 
-  await canvas.getByRole('button', { name: 'Element actions' }).click();
+  await canvas.getByRole('button', { name: 'Dropdown actions' }).click();
   await page.getByRole('menuitem', { name: 'Edit options' }).click();
   await expect(dialog.getByRole('textbox', { name: 'Option 2 text' })).toHaveValue('Large');
 });
@@ -115,9 +129,9 @@ test('deletes a dropped element through its actions menu after confirming', asyn
   await expect(canvas.getByTestId('dropped-div')).toHaveCount(1);
 
   const openDeleteDialog = async () => {
-    await canvas.getByRole('button', { name: 'Element actions' }).click();
+    await canvas.getByRole('button', { name: 'Block text actions' }).click();
     await page.getByRole('menuitem', { name: 'Delete element' }).click();
-    return page.getByRole('dialog', { name: 'Delete element' });
+    return page.getByRole('alertdialog', { name: 'Delete element' });
   };
 
   await (await openDeleteDialog()).getByRole('button', { name: 'Cancel' }).click();

@@ -85,3 +85,22 @@ test('a picked theme also restyles overlays rendered outside the app root', asyn
   await expect.poll(() => background(themeList)).not.toBe(themeListBefore);
   await expect.poll(() => background(themeList)).not.toBe(unthemed);
 });
+
+test('picks a theme from the keyboard, announces it and tells it on the button', async ({ page }) => {
+  await page.goto('/');
+  const trigger = page.getByRole('banner').getByRole('button', { name: 'Change theme' });
+  await expect(trigger).toHaveAccessibleDescription('Current theme: fantasy');
+
+  await trigger.focus();
+  await page.keyboard.press('Enter');
+  await expect(theme(page, 'fantasy')).toBeFocused();
+  await page.keyboard.type('dra');
+  await expect(theme(page, 'dracula')).toBeFocused();
+  await page.keyboard.press('Enter');
+
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dracula');
+  await expect(page.getByRole('menu')).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  await expect(trigger).toHaveAccessibleDescription('Current theme: dracula');
+  await expect(page.getByText('Theme changed to dracula.')).toBeAttached();
+});

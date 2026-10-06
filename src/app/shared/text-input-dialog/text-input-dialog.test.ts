@@ -4,6 +4,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/angular';
 import { openTextInputDialog, TextInputDialog } from './text-input-dialog';
 
 const title = 'Edit text';
+const description = 'Change the text.';
 const value = 'enter text';
 const cancelled = 'cancelled';
 
@@ -19,15 +20,13 @@ class DialogHost {
   protected readonly result = signal('');
 
   protected open(): void {
-    openTextInputDialog(this.dialog, { title, value }).subscribe((text) =>
+    openTextInputDialog(this.dialog, { title, description, value }).subscribe((text) =>
       this.result.set(text ?? cancelled),
     );
   }
 }
 
 describe(TextInputDialog.name, () => {
-  const description = 'Change the text.';
-
   async function mount(inputs: { description?: string; value?: string } = {}) {
     return render(TextInputDialog, {
       inputs: { title, ...inputs },
@@ -82,6 +81,14 @@ describe(TextInputDialog.name, () => {
       await render(DialogHost);
       fireEvent.click(screen.getByRole('button', { name: 'Open' }));
       await screen.findByRole('dialog', { name: title });
+    });
+
+    it('should be described by its description', () => {
+      expect(screen.getByRole('dialog')).toHaveAccessibleDescription(description);
+    });
+
+    it('should start in the text input', async () => {
+      await waitFor(() => expect(screen.getByRole('textbox', { name: 'Text' })).toHaveFocus());
     });
 
     it('should close with the entered text when saved', async () => {

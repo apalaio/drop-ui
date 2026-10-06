@@ -2,6 +2,7 @@
   type="button"
   class="btn btn-ghost btn-sm gap-1.5 px-1.5"
   aria-label="Change theme"
+  aria-describedby="theme-picker-current"
   [cdkMenuTriggerFor]="themeList"
   (cdkMenuOpened)="store.loadAllThemes()"
 >
@@ -21,6 +22,8 @@
     <path d="M1799 349l242 241-1017 1017L7 590l242-241 775 775 775-775z" />
   </svg>
 </button>
+<!-- Read out with the button, which otherwise only tells the current theme once its list is open. -->
+<span id="theme-picker-current" hidden>Current theme: {{ store.theme() }}</span>
 
 <ng-template #swatch>
   <span class="size-1 rounded-full bg-base-content"></span>

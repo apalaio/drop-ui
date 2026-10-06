@@ -2,6 +2,7 @@ import { Dialog, DialogRef } from '@angular/cdk/dialog';
 import { Component, inject, input, inputBinding, linkedSignal } from '@angular/core';
 import { form, FormField, FormRoot, validate } from '@angular/forms/signals';
 import { Observable } from 'rxjs';
+import { dialogDescriptionId, dialogTitleId, labelledDialogConfig } from '../dialog-labelling';
 
 @Component({
   selector: 'dui-text-input-dialog',
@@ -15,6 +16,9 @@ export class TextInputDialog {
   readonly value = input('');
 
   private readonly dialogRef = inject<DialogRef<string>>(DialogRef);
+
+  protected readonly titleId = dialogTitleId(this.dialogRef.id);
+  protected readonly descriptionId = dialogDescriptionId(this.dialogRef.id);
 
   protected readonly model = linkedSignal(() => ({ text: this.value() }));
   protected readonly textForm = form(
@@ -32,14 +36,16 @@ export interface TextInputDialogOptions {
   title: string;
   description?: string;
   value?: string;
+  /** Element to focus once the dialog closes; defaults to whatever had focus when it opened. */
+  restoreFocus?: HTMLElement;
 }
 
 export function openTextInputDialog(
   dialog: Dialog,
-  { title, description = '', value = '' }: TextInputDialogOptions,
+  { title, description = '', value = '', restoreFocus }: TextInputDialogOptions,
 ): Observable<string | undefined> {
   return dialog.open<string>(TextInputDialog, {
-    ariaLabel: title,
+    ...labelledDialogConfig({ hasDescription: !!description, restoreFocus }),
     bindings: [
       inputBinding('title', () => title),
       inputBinding('description', () => description),

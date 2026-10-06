@@ -1,10 +1,13 @@
-import { fireEvent, render, screen } from '@testing-library/angular';
+import { signal } from '@angular/core';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/angular';
 import {
   CanvasElement,
   DatepickerCanvasElement,
   DropdownCanvasElement,
   TextControlCanvasElement,
 } from '../models/canvas-element';
+import { GridCell } from '../models/grid-layout';
+import { BuilderStore } from '../state/builder-store';
 import { DroppedElement } from './dropped-element';
 
 describe(DroppedElement.name, () => {
@@ -50,8 +53,32 @@ describe(DroppedElement.name, () => {
     ...cell,
   };
 
-  async function mount(element: CanvasElement) {
-    return render(DroppedElement, { inputs: { element } });
+  const divActions = 'Block text actions';
+  const dropdownActions = 'Dropdown actions';
+  const moveEarlier = 'Move earlier';
+  const moveLater = 'Move later';
+  const moveToCell = 'Move to cell';
+
+  async function mount(element: CanvasElement, canvas?: { canvasElements: CanvasElement[]; cells: GridCell[] }) {
+    return render(DroppedElement, {
+      inputs: { element },
+      providers: canvas
+        ? [
+            {
+              provide: BuilderStore,
+              useValue: {
+                canvasElements: signal(canvas.canvasElements),
+                cells: signal(canvas.cells),
+                moveElement: () => undefined,
+              },
+            },
+          ]
+        : [],
+    });
+  }
+
+  function menuActions(): (string | undefined)[] {
+    return screen.getAllByRole('menuitem').map((item) => item.textContent?.trim());
   }
 
   it('should tag the wrapper with the element uid', async () => {
@@ -231,16 +258,38 @@ describe(DroppedElement.name, () => {
     });
   });
 
+  describe('actions button', () => {
+    it.each([
+      { element: div, name: 'Block text actions' },
+      { element: span, name: 'Inline text actions' },
+      { element: textInput, name: 'Text input actions' },
+      { element: textfield, name: 'Textfield actions' },
+      { element: datepicker, name: 'Datepicker actions' },
+      { element: dropdown, name: 'Dropdown actions' },
+    ])('should be named after the $element.type it acts on', async ({ element, name }) => {
+      await mount(element);
+
+      expect(screen.getByRole('button', { name })).toBeInTheDocument();
+    });
+
+    it('should give its menu the same name', async () => {
+      await mount(div);
+
+      fireEvent.click(screen.getByRole('button', { name: divActions }));
+
+      expect(await screen.findByRole('menu', { name: divActions })).toBeInTheDocument();
+    });
+  });
+
   describe('actions menu of a datepicker', () => {
     beforeEach(async () => mount(datepicker));
 
     it('should not offer edit text, as a date input shows no text', async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Element actions' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Datepicker actions' }));
 
       await screen.findByRole('menu');
-      const actions = screen.getAllByRole('menuitem').map((item) => item.textContent?.trim());
 
-      expect(actions).toEqual(['Delete element']);
+      expect(menuActions()).toEqual(['Delete element']);
     });
   });
 
@@ -248,16 +297,15 @@ describe(DroppedElement.name, () => {
     beforeEach(async () => mount(dropdown));
 
     it('should list edit options then delete element, without edit text', async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Element actions' }));
+      fireEvent.click(screen.getByRole('button', { name: dropdownActions }));
 
       await screen.findByRole('menu');
-      const actions = screen.getAllByRole('menuitem').map((item) => item.textContent?.trim());
 
-      expect(actions).toEqual(['Edit options', 'Delete element']);
+      expect(menuActions()).toEqual(['Edit options', 'Delete element']);
     });
 
     it('should open the edit options dialog, prefilled with the element options, from the edit options action', async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Element actions' }));
+      fireEvent.click(screen.getByRole('button', { name: dropdownActions }));
       fireEvent.click(await screen.findByRole('menuitem', { name: 'Edit options' }));
 
       const dialog = await screen.findByRole('dialog', { name: 'Edit options' });
@@ -268,38 +316,154 @@ describe(DroppedElement.name, () => {
       expect(screen.getByRole('textbox', { name: 'Option 2 text' })).toHaveValue(large.text);
       expect(screen.getByRole('textbox', { name: 'Option 2 value' })).toHaveValue(large.value);
     });
+
+    it('should return focus to the actions button when the edit options dialog is cancelled', async () => {
+      fireEvent.click(screen.getByRole('button', { name: dropdownActions }));
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Edit options' }));
+      await screen.findByRole('dialog', { name: 'Edit options' });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+      await waitFor(() => expect(screen.getByRole('button', { name: dropdownActions })).toHaveFocus());
+    });
   });
 
   describe('actions menu', () => {
     beforeEach(async () => mount(div));
 
     it('should list edit text then delete element when the actions button is clicked', async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Element actions' }));
+      fireEvent.click(screen.getByRole('button', { name: divActions }));
 
       await screen.findByRole('menu');
-      const actions = screen.getAllByRole('menuitem').map((item) => item.textContent?.trim());
 
-      expect(actions).toEqual(['Edit text', 'Delete element']);
+      expect(menuActions()).toEqual(['Edit text', 'Delete element']);
     });
 
     it('should open the delete confirmation from the delete element action', async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Element actions' }));
+      fireEvent.click(screen.getByRole('button', { name: divActions }));
       fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete element' }));
 
-      const dialog = await screen.findByRole('dialog', { name: 'Delete element' });
+      const dialog = await screen.findByRole('alertdialog', { name: 'Delete element' });
 
       expect(dialog).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
     });
 
+    it('should return focus to the actions button when the deletion is cancelled', async () => {
+      fireEvent.click(screen.getByRole('button', { name: divActions }));
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete element' }));
+      await screen.findByRole('alertdialog', { name: 'Delete element' });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+      await waitFor(() => expect(screen.getByRole('button', { name: divActions })).toHaveFocus());
+    });
+
     it('should open the edit text dialog, prefilled with the element text, from the edit text action', async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Element actions' }));
+      fireEvent.click(screen.getByRole('button', { name: divActions }));
       fireEvent.click(await screen.findByRole('menuitem', { name: 'Edit text' }));
 
       const dialog = await screen.findByRole('dialog', { name: 'Edit text' });
 
       expect(dialog).toBeInTheDocument();
       expect(screen.getByRole('textbox', { name: 'Text' })).toHaveValue(text);
+    });
+
+    it('should return focus to the actions button when the edit text dialog is cancelled', async () => {
+      fireEvent.click(screen.getByRole('button', { name: divActions }));
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Edit text' }));
+      await screen.findByRole('dialog', { name: 'Edit text' });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+      await waitFor(() => expect(screen.getByRole('button', { name: divActions })).toHaveFocus());
+    });
+  });
+
+  describe('actions menu of an element that shares its cell', () => {
+    const first: CanvasElement = { ...div, uid: 'first' };
+    const middle: CanvasElement = { ...div, uid: 'middle' };
+    const last: CanvasElement = { ...div, uid: 'last' };
+    const neighbours = [first, middle, last];
+
+    async function openMenuOf(element: CanvasElement) {
+      await mount(element, { canvasElements: neighbours, cells: [{ ...cell, elements: neighbours }] });
+      fireEvent.click(screen.getByRole('button', { name: divActions }));
+      await screen.findByRole('menu');
+    }
+
+    it('should offer to move the element earlier and later, between editing and deleting', async () => {
+      await openMenuOf(middle);
+
+      expect(menuActions()).toEqual(['Edit text', 'Move earlier', 'Move later', 'Delete element']);
+    });
+
+    it('should enable both moves for an element in between', async () => {
+      await openMenuOf(middle);
+
+      expect(screen.getByRole('menuitem', { name: moveEarlier })).not.toHaveAttribute('aria-disabled');
+      expect(screen.getByRole('menuitem', { name: moveLater })).not.toHaveAttribute('aria-disabled');
+    });
+
+    it('should disable move earlier for the first element', async () => {
+      await openMenuOf(first);
+
+      expect(screen.getByRole('menuitem', { name: moveEarlier })).toHaveAttribute('aria-disabled', 'true');
+      expect(screen.getByRole('menuitem', { name: moveLater })).not.toHaveAttribute('aria-disabled');
+    });
+
+    it('should disable move later for the last element', async () => {
+      await openMenuOf(last);
+
+      expect(screen.getByRole('menuitem', { name: moveLater })).toHaveAttribute('aria-disabled', 'true');
+      expect(screen.getByRole('menuitem', { name: moveEarlier })).not.toHaveAttribute('aria-disabled');
+    });
+
+    it.each([moveEarlier, moveLater])('should close the menu once %s is picked', async (action) => {
+      await openMenuOf(middle);
+
+      fireEvent.click(screen.getByRole('menuitem', { name: action }));
+
+      await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument());
+    });
+  });
+
+  describe('actions menu of an element in a grid of several cells', () => {
+    const cells: GridCell[] = [
+      { row: 0, column: 0, elements: [div] },
+      { row: 0, column: 1, elements: [] },
+      { row: 1, column: 0, elements: [] },
+      { row: 1, column: 1, elements: [] },
+    ];
+
+    beforeEach(async () => {
+      await mount(div, { canvasElements: [div], cells });
+      fireEvent.click(screen.getByRole('button', { name: divActions }));
+      await screen.findByRole('menu');
+    });
+
+    it('should offer to move the element to another cell', () => {
+      expect(menuActions()).toEqual(['Edit text', moveToCell, 'Delete element']);
+    });
+
+    it('should list every cell but its own in the move to cell menu', async () => {
+      fireEvent.click(screen.getByRole('menuitem', { name: moveToCell }));
+
+      const cellMenu = await screen.findByRole('menu', { name: moveToCell });
+      const targets = within(cellMenu)
+        .getAllByRole('menuitem')
+        .map((item) => item.textContent?.trim());
+
+      expect(targets).toEqual(['Row 1, column 2', 'Row 2, column 1', 'Row 2, column 2']);
+    });
+
+    it('should close both menus once a cell is picked', async () => {
+      fireEvent.click(screen.getByRole('menuitem', { name: moveToCell }));
+      const cellMenu = await screen.findByRole('menu', { name: moveToCell });
+
+      fireEvent.click(within(cellMenu).getByRole('menuitem', { name: 'Row 2, column 2' }));
+
+      await waitFor(() => expect(screen.queryAllByRole('menu').length).toBe(0));
     });
   });
 });

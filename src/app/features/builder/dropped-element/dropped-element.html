@@ -1,13 +1,18 @@
 @let el = element();
 
-<span class="badge badge-ghost badge-xs absolute top-2 right-10 opacity-0 group-hover:opacity-100">
+<!-- Hidden from assistive tech: the actions button right after it already names the element type. -->
+<span
+  class="badge badge-ghost badge-xs absolute top-2 right-10 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100"
+  aria-hidden="true"
+>
   {{ el.type }}
 </span>
 
 <button
+  #actionsTrigger
   type="button"
   class="btn btn-ghost btn-xs btn-square absolute top-1 right-1"
-  aria-label="Element actions"
+  [attr.aria-label]="actionsLabel()"
   [cdkMenuTriggerFor]="actions"
   (mousedown)="$event.stopPropagation()"
   (touchstart)="$event.stopPropagation()"
@@ -26,7 +31,11 @@
 </button>
 
 <ng-template #actions>
-  <ul cdkMenu class="menu w-36 rounded-box bg-base-100 p-1 shadow-md">
+  <ul
+    cdkMenu
+    class="menu w-36 rounded-box bg-base-100 p-1 shadow-md"
+    [attr.aria-label]="actionsLabel()"
+  >
     @if ('text' in el) {
       <li role="none">
         <button type="button" cdkMenuItem (cdkMenuItemTriggered)="editText(el)">Edit text</button>
@@ -39,11 +48,54 @@
         </button>
       </li>
     }
+    @if (canReorder()) {
+      <li role="none" [class.menu-disabled]="isFirst()">
+        <button
+          type="button"
+          cdkMenuItem
+          [cdkMenuItemDisabled]="isFirst()"
+          (cdkMenuItemTriggered)="moveWithinCell(-1)"
+        >
+          Move earlier
+        </button>
+      </li>
+      <li role="none" [class.menu-disabled]="isLast()">
+        <button
+          type="button"
+          cdkMenuItem
+          [cdkMenuItemDisabled]="isLast()"
+          (cdkMenuItemTriggered)="moveWithinCell(1)"
+        >
+          Move later
+        </button>
+      </li>
+    }
+    @if (otherCells().length) {
+      <li role="none">
+        <button type="button" cdkMenuItem [cdkMenuTriggerFor]="cells">Move to cell</button>
+      </li>
+    }
     <li role="none">
       <button type="button" class="text-error" cdkMenuItem (cdkMenuItemTriggered)="deleteElement()">
         Delete element
       </button>
     </li>
+  </ul>
+</ng-template>
+
+<ng-template #cells>
+  <ul
+    cdkMenu
+    class="menu max-h-96 w-44 flex-nowrap overflow-y-auto rounded-box bg-base-100 p-1 shadow-md"
+    aria-label="Move to cell"
+  >
+    @for (cell of otherCells(); track cell.row + ':' + cell.column) {
+      <li role="none">
+        <button type="button" cdkMenuItem (cdkMenuItemTriggered)="moveToCell(cell)">
+          {{ cellLabel(cell) }}
+        </button>
+      </li>
+    }
   </ul>
 </ng-template>
 

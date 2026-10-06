@@ -1,3 +1,4 @@
+import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { DOCUMENT, effect, inject } from '@angular/core';
 import { patchState, signalStore, withHooks, withMethods, withState } from '@ngrx/signals';
 import themeOrder from 'daisyui/functions/themeOrder';
@@ -27,13 +28,15 @@ const createInitialState = (root: HTMLElement): ThemeState => {
 export const ThemeStore = signalStore(
   { providedIn: 'root' },
   withState(() => createInitialState(inject(DOCUMENT).documentElement)),
-  withMethods((store) => ({
+  withMethods((store, announcer = inject(LiveAnnouncer)) => ({
     loadAllThemes(): void {
       patchState(store, { allThemesRequested: true });
     },
     setTheme(theme: string): void {
       if (THEMES.includes(theme)) {
         patchState(store, { theme, allThemesRequested: true });
+        // The only other sign of the change is the new colours.
+        announcer.announce(`Theme changed to ${theme}.`);
       }
     },
   })),

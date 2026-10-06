@@ -37,6 +37,16 @@ describe(ThemePicker.name, () => {
     it('should not load the other themes', () => {
       expect(allThemesStylesheet()).not.toBeInTheDocument();
     });
+
+    it('should describe the button with the current theme', () => {
+      expect(screen.getByRole('button', { name: triggerLabel })).toHaveAccessibleDescription(
+        `Current theme: ${startingTheme}`,
+      );
+    });
+
+    it('should mark the button as collapsed', () => {
+      expect(screen.getByRole('button', { name: triggerLabel })).toHaveAttribute('aria-expanded', 'false');
+    });
   });
 
   describe('when the button is clicked', () => {
@@ -92,6 +102,18 @@ describe(ThemePicker.name, () => {
 
     it('should close the theme list', async () => {
       await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument());
+    });
+
+    it('should describe the button with the picked theme', async () => {
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: triggerLabel })).toHaveAccessibleDescription(
+          `Current theme: ${otherTheme}`,
+        ),
+      );
+    });
+
+    it('should announce the picked theme', async () => {
+      expect(await screen.findByText(`Theme changed to ${otherTheme}.`)).toHaveAttribute('aria-live', 'polite');
     });
 
     it('should mark the picked theme as checked when the list is reopened', async () => {

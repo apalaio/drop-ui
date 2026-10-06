@@ -77,7 +77,7 @@ test('edits the placeholder of a dropped text input through its actions menu', a
   const input = canvas.getByTestId('dropped-text-input');
   await expect(input).toHaveAttribute('placeholder', 'enter text');
 
-  await canvas.getByRole('button', { name: 'Element actions' }).click();
+  await canvas.getByRole('button', { name: 'Text input actions' }).click();
   await page.getByRole('menuitem', { name: 'Edit text' }).click();
 
   const dialog = page.getByRole('dialog', { name: 'Edit text' });
@@ -152,7 +152,7 @@ test('keeps the selected option when a dropdown is moved to another cell', async
   const canvas = page.getByRole('region', { name: 'Canvas' });
   await setColumns(page, 2);
   await drag(page, palette.getByRole('listitem').filter({ hasText: 'Dropdown' }), cell(canvas, 1, 1));
-  await canvas.getByRole('button', { name: 'Element actions' }).click();
+  await canvas.getByRole('button', { name: 'Dropdown actions' }).click();
   await page.getByRole('menuitem', { name: 'Edit options' }).click();
   const dialog = page.getByRole('dialog', { name: 'Edit options' });
   await dialog.getByRole('textbox', { name: 'Option 1 text' }).fill('Small');

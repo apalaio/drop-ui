@@ -5,12 +5,15 @@
   [style.grid-template-columns]="gridTemplateColumns()"
 >
   @for (cell of store.cells(); track cell.row + ':' + cell.column) {
+    <!-- tabindex="-1": not a tab stop, but able to take the focus of an element deleted from it. -->
     <div
-      class="canvas-drop-zone -mt-0.5 -ml-0.5 min-h-24 border-2 border-dashed border-base-300 bg-base-100 p-6 transition-colors"
+      #cellElement
+      class="canvas-drop-zone -mt-0.5 -ml-0.5 min-h-24 border-2 border-dashed border-base-300 bg-base-100 p-6 transition-colors motion-reduce:transition-none"
       [class]="cell.elements.length ? null : 'flex flex-col'"
       role="group"
+      tabindex="-1"
       data-testid="canvas-cell"
-      [attr.aria-label]="'Row ' + (cell.row + 1) + ', column ' + (cell.column + 1)"
+      [attr.aria-label]="cellLabel(cell)"
       [attr.data-row]="cell.row"
       [attr.data-column]="cell.column"
       cdkDropList
@@ -19,9 +22,15 @@
       (cdkDropListDropped)="drop($event)"
     >
       @for (element of cell.elements; track element.uid) {
-        <dui-dropped-element cdkDrag [cdkDragData]="element" [element]="element" />
+        <dui-dropped-element
+          cdkDrag
+          [cdkDragData]="element"
+          [element]="element"
+          (moved)="focusElement(element.uid)"
+          (removed)="focusCell(cellElement)"
+        />
       } @empty {
-        <p class="m-auto text-sm text-base-content/50">Drop elements here</p>
+        <p class="m-auto text-sm text-base-content/70">Drop elements here</p>
       }
     </div>
   }

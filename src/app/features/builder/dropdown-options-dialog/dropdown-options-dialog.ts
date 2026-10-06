@@ -12,6 +12,11 @@ import {
 } from '@angular/core';
 import { applyEach, form, FormField, FormRoot, validate } from '@angular/forms/signals';
 import { Observable } from 'rxjs';
+import {
+  dialogDescriptionId,
+  dialogTitleId,
+  labelledDialogConfig,
+} from '../../../shared/dialog-labelling';
 import { DropdownOption } from '../models/dropdown-option';
 
 const BLANK_OPTION: DropdownOption = { text: '', value: '' };
@@ -34,6 +39,9 @@ export class DropdownOptionsDialog {
   private readonly dialogRef = inject<DialogRef<DropdownOption[]>>(DialogRef);
   private readonly injector = inject(Injector);
   private readonly textInputs = viewChildren<ElementRef<HTMLInputElement>>('textInput');
+
+  protected readonly titleId = dialogTitleId(this.dialogRef.id);
+  protected readonly descriptionId = dialogDescriptionId(this.dialogRef.id);
 
   // Signal forms stamp a tracking symbol onto every array item, so the rows have to be the
   // dialog's own copies (the caller's may be frozen store state) and are copied again on the way out.
@@ -79,14 +87,16 @@ export interface DropdownOptionsDialogOptions {
   title: string;
   description?: string;
   options?: DropdownOption[];
+  /** Element to focus once the dialog closes; defaults to whatever had focus when it opened. */
+  restoreFocus?: HTMLElement;
 }
 
 export function openDropdownOptionsDialog(
   dialog: Dialog,
-  { title, description = '', options = [] }: DropdownOptionsDialogOptions,
+  { title, description = '', options = [], restoreFocus }: DropdownOptionsDialogOptions,
 ): Observable<DropdownOption[] | undefined> {
   return dialog.open<DropdownOption[]>(DropdownOptionsDialog, {
-    ariaLabel: title,
+    ...labelledDialogConfig({ hasDescription: !!description, restoreFocus }),
     bindings: [
       inputBinding('title', () => title),
       inputBinding('description', () => description),

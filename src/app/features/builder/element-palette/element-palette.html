@@ -1,8 +1,14 @@
-<h2 class="mb-2 text-xs font-semibold tracking-wide text-base-content/60 uppercase">Elements</h2>
+<h2
+  id="element-palette-heading"
+  class="mb-2 text-xs font-semibold tracking-wide text-base-content/70 uppercase"
+>
+  Elements
+</h2>
 
 <ul
   id="palette-drop-list"
   class="menu w-full gap-1 p-0"
+  aria-labelledby="element-palette-heading"
   cdkDropList
   cdkDropListSortingDisabled
   cdkDropListHasAnchor
@@ -10,10 +16,32 @@
 >
   @for (item of store.paletteItems(); track item.uid) {
     <li cdkDrag [cdkDragData]="item" [attr.data-uid]="item.uid">
-      <div class="cursor-grab justify-between rounded-field border border-base-300 bg-base-100">
+      <!-- A button, so an item can be added without dragging: its menu asks which cell to add it to. -->
+      <button
+        type="button"
+        class="w-full cursor-grab justify-between rounded-field border border-base-300 bg-base-100 text-start focus-visible:ring-2 focus-visible:ring-primary"
+        [attr.aria-label]="'Add ' + item.label"
+        [cdkMenuTriggerFor]="cells"
+      >
         <span>{{ item.label }}</span>
-        <code class="text-xs text-base-content/50">&lt;{{ item.type }}&gt;</code>
-      </div>
+        <code class="text-xs text-base-content/70">&lt;{{ item.type }}&gt;</code>
+      </button>
+
+      <ng-template #cells>
+        <ul
+          cdkMenu
+          class="menu max-h-96 w-44 flex-nowrap overflow-y-auto rounded-box bg-base-100 p-1 shadow-md"
+          [attr.aria-label]="'Add ' + item.label + ' to'"
+        >
+          @for (cell of store.cells(); track cell.row + ':' + cell.column) {
+            <li role="none">
+              <button type="button" cdkMenuItem (cdkMenuItemTriggered)="add(item, cell)">
+                {{ cellLabel(cell) }}
+              </button>
+            </li>
+          }
+        </ul>
+      </ng-template>
     </li>
   }
 </ul>
