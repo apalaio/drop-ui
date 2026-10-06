@@ -29,6 +29,31 @@ test('drops a div and a span from the palette onto the canvas', async ({ page })
   expect(types.sort()).toEqual(['div', 'span']);
 });
 
+test('lays dropped spans out next to each other and a div on a line of its own', async ({ page }) => {
+  await page.goto('/');
+  const palette = page.getByRole('complementary', { name: 'Sidebar' });
+  const canvas = page.getByRole('region', { name: 'Canvas' });
+  const spans = canvas.locator('[data-element-type="span"]');
+  const boxes = (wrappers: Locator) => wrappers.evaluateAll((all) => all.map((one) => one.getBoundingClientRect().toJSON()));
+
+  await drag(page, palette.getByRole('listitem').filter({ hasText: 'Span' }), canvas);
+  await expect(spans).toHaveCount(1);
+  await drag(page, palette.getByRole('listitem').filter({ hasText: 'Span' }), canvas);
+  await expect(spans).toHaveCount(2);
+
+  const [first, second] = await boxes(spans);
+  expect(second.top).toBe(first.top);
+  expect(second.left).toBeGreaterThanOrEqual(first.right);
+
+  await drag(page, palette.getByRole('listitem').filter({ hasText: 'Div' }), canvas);
+  await expect(canvas.getByTestId('dropped-div')).toHaveCount(1);
+
+  const [div] = await boxes(canvas.locator('[data-element-type="div"]'));
+  for (const span of await boxes(spans)) {
+    expect(span.bottom <= div.top || span.top >= div.bottom).toBe(true);
+  }
+});
+
 test('edits the text of a dropped element through its actions menu', async ({ page }) => {
   await page.goto('/');
   const palette = page.getByRole('complementary', { name: 'Sidebar' });

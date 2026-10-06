@@ -6,13 +6,15 @@
 >
   @for (cell of store.cells(); track cell.row + ':' + cell.column) {
     <div
-      class="canvas-drop-zone -mt-0.5 -ml-0.5 flex min-h-24 flex-col gap-2 border-2 border-dashed border-base-300 bg-base-100 p-6 transition-colors"
+      class="canvas-drop-zone -mt-0.5 -ml-0.5 min-h-24 border-2 border-dashed border-base-300 bg-base-100 p-6 transition-colors"
+      [class]="cell.elements.length ? null : 'flex flex-col'"
       role="group"
       data-testid="canvas-cell"
       [attr.aria-label]="'Row ' + (cell.row + 1) + ', column ' + (cell.column + 1)"
       [attr.data-row]="cell.row"
       [attr.data-column]="cell.column"
       cdkDropList
+      cdkDropListOrientation="mixed"
       [cdkDropListData]="cell"
       (cdkDropListDropped)="drop($event)"
     >

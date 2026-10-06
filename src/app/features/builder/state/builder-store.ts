@@ -22,8 +22,8 @@ export const DEFAULT_ELEMENT_TEXT = 'enter text';
 
 const createInitialState = (): BuilderState => ({
   paletteItems: [
-    { uid: crypto.randomUUID(), type: 'div', label: 'Div' },
-    { uid: crypto.randomUUID(), type: 'span', label: 'Span' },
+    { uid: crypto.randomUUID(), type: 'div', label: 'Block text' },
+    { uid: crypto.randomUUID(), type: 'span', label: 'Inline text' },
     { uid: crypto.randomUUID(), type: 'text-input', label: 'Text input' },
     { uid: crypto.randomUUID(), type: 'textfield', label: 'Textfield' },
     { uid: crypto.randomUUID(), type: 'datepicker', label: 'Datepicker' },
@@ -55,7 +55,6 @@ const createElement = (
 const hasOption = (options: DropdownOption[], value: string): boolean =>
   options.some((option) => option.value === value);
 
-/** A dropdown always shows one of its options, so a selection that is gone falls back to the first. */
 const selectedValue = (options: DropdownOption[], current: string): string =>
   hasOption(options, current) ? current : (options[0]?.value ?? '');
 
@@ -147,7 +146,6 @@ export const BuilderStore = signalStore(
         canvasElements: canvasElements.filter((element) => element.uid !== uid),
       }));
     },
-    /** Moves an element to `index` in `cell`, counted without the element itself. */
     moveElement(uid: string, cell: CellPosition, index: number): void {
       patchState(store, ({ canvasElements }) => {
         const element = canvasElements.find((candidate) => candidate.uid === uid);

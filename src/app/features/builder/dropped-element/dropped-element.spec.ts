@@ -112,6 +112,22 @@ describe('DroppedElement', () => {
     });
   });
 
+  describe('display', () => {
+    it('lays a span out inline', () => {
+      const classes = (create(span).nativeElement as HTMLElement).classList;
+
+      expect(classes).toContain('inline-block');
+      expect(classes).not.toContain('block');
+    });
+
+    it.each([div, textInput, textfield, datepicker, dropdown])('lays a $type out as a block', (element) => {
+      const classes = (create(element).nativeElement as HTMLElement).classList;
+
+      expect(classes).toContain('block');
+      expect(classes).not.toContain('inline-block');
+    });
+  });
+
   describe('editText', () => {
     it('stores the text the user saved', () => {
       dialogResult = of('Hello');
