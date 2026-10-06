@@ -3,7 +3,7 @@ DropUI is a drag & drop ui builder. The user selects a ui element type from the 
 ## Agent behavior
 
 - Don't EVER, under any circumstances git commit anything. You are BANNED from commiting even the tiniest change.
-- Every time a task is completed, run all three test suites (`npm test -- --watch=false`, `npm run test:components -- --watch=false` and `npm run e2e`) and make sure they pass. A task is not done until all tests are green.
+- Every time a task that changes anything the build or tests consume (source, tests, config, styles, dependencies) is completed, run all three test suites (`npm test -- --watch=false`, `npm run test:components -- --watch=false` and `npm run e2e`) and make sure they pass. Such a task is not done until all tests are green. Skip the suites for changes that only touch docs, skills, guides or plans.
 
 ## Architecture
 

@@ -1,6 +1,6 @@
 # Plan: DropUI React port (`drop-ui-react`)
 
-> Revised 2026-10-05 against commit `9d4ff1c` ("dropdown"). The first version predated the grid-layout, form-elements, theming and dropdown commits, the two ADRs and the comment rules in `CLAUDE.md`. Updated the same day for three uncommitted changes on top of that commit: control values held in `BuilderStore`, the dropdown options dialog renamed and moved into the builder feature, and themes loaded on demand.
+> Revised 2026-10-06 against commit `ef0cebe` ("merge accessibility work into bundle-size branch"). The previous revision covered the app up to `6d34233` ("values are state"). Three changes have landed since: inline spans (`3a7a89f`), the bundle-size pass (`96b1a4e`) and the accessibility pass (`b13d11e`), which added a keyboard alternative to drag & drop, user-facing element labels, screen reader announcements, focus management, dialog labelling and reduced-motion handling.
 
 ## Context
 
@@ -11,7 +11,7 @@ Decisions made with the user:
 - **Location:** a new sibling repo, `C:\Users\telis\Repos\drop-ui-react`. The Angular repo is not modified.
 - **State:** Zustand.
 
-Goal: feature parity with the Angular app at `9d4ff1c` plus those changes, proven by the same three test suites. The five Playwright files in `drop-ui/e2e/` (25 tests) are the acceptance contract: they are copied over and must pass without changes to their assertions.
+Goal: feature parity with the Angular app at `ef0cebe`, proven by the same three test suites. The six Playwright files in `drop-ui/e2e/` (42 tests) are the acceptance contract: they are copied over and must pass without changes to their assertions.
 
 What is being ported:
 
@@ -21,32 +21,35 @@ What is being ported:
 | Stores | 2 | `BuilderStore`, `ThemeStore` |
 | Components | 9 + root | `BuilderShell`, `Canvas`, `DroppedElement`, `ElementPalette`, `LayoutPanel`, `ThemePicker`, `ConfirmationDialog`, `TextInputDialog`, `DropdownOptionsDialog` |
 | Element types | 6 | `div`, `span`, `text-input`, `textfield`, `datepicker`, `dropdown` |
-| Model files | 4 | `canvas-element.ts`, `grid-layout.ts`, `palette-item.ts`, `dropdown-option.ts` |
-| Test files | 18 + 5 e2e | 8 `*.spec.ts`, 10 `*.test.ts` |
+| Model files | 4 | `canvas-element.ts`, `grid-layout.ts` (now also `cellLabel`), `palette-item.ts` (now also `ELEMENT_LABELS`), `dropdown-option.ts` |
+| Test files | 20 + 6 e2e | 10 `*.spec.ts`, 10 `*.test.ts` |
 | ADRs | 2 | `docs/adr/0001`, `0002` |
+
+Not ported, because the React stack makes them unnecessary: `shared/dialog-labelling.ts` (see Dialogs) and the on-demand `import()` of the two form dialogs (see Bundle size).
 
 ## Stack
 
-Versions are the `latest` tags on npm, checked 2026-10-04. The new features need no additional library.
+Versions are the `latest` tags on npm, checked 2026-10-04. The Base UI API details this revision relies on were checked against base-ui.com on 2026-10-06; the ones that could not be confirmed there are marked "confirm" below.
 
 | Angular today | React port | Notes |
 |---|---|---|
 | Angular 22, `@angular/build` | **React 19.3** + **Vite 8** + `@vitejs/plugin-react` 6 | TypeScript ~6.0 as now |
 | `@ngrx/signals` SignalStore | **Zustand 5** | see Stores |
 | `@angular/cdk/drag-drop` | **`@dnd-kit/core` 6 + `@dnd-kit/sortable`** | pointer-event based, so the e2e drag helpers work unchanged |
-| `@angular/cdk/menu` (incl. `cdkMenuItemRadio`), `@angular/cdk/dialog`, overlay, focus trap | **Base UI** (`@base-ui/react` 1.x) `Menu` (with `RadioGroup` / `RadioItem`) and `Dialog` | unstyled, styled with the same DaisyUI classes |
+| `@angular/cdk/menu` (`cdkMenuItem`, `cdkMenuItemRadio`, nested `cdkMenuTriggerFor`) | **Base UI** (`@base-ui/react` 1.x) `Menu`, with `RadioGroup` / `RadioItem` and `SubmenuRoot` / `SubmenuTrigger` | unstyled, styled with the same DaisyUI classes |
+| `@angular/cdk/dialog`, overlay, focus trap | Base UI `Dialog` and `AlertDialog` | `Popup` takes `initialFocus` and `finalFocus` |
+| `LiveAnnouncer` (`@angular/cdk/a11y`) + `a11y-prebuilt.css` | a small `announcer.ts` owning one `aria-live="polite"` region, hidden with Tailwind's `sr-only` | see Announcements |
 | Signal Forms (`form`, `validate`, `applyEach`) | plain `useState` + derived `invalid` | see Dialogs; React Hook Form's `useFieldArray` is the upgrade path if per-field error messages are ever needed |
 | `inject()` DI | React context + hooks | one provider per store |
 | RxJS (dialog results) | none | dialogs become controlled components |
-| `@angular/router` (empty routes) | none | add a router when a route exists |
-| Tailwind 4 + DaisyUI 5, `themes: false`; daisyUI's prebuilt `theme/*.css` and `themes.css` copied as assets | same, via `@tailwindcss/vite`; the copy done with `vite-plugin-static-copy` | `daisyui` is a runtime dependency; `daisyui/functions/themeOrder` is framework-agnostic and imports as is |
+| Tailwind 4 + DaisyUI 5, `themes: false`, `source(none)`; daisyUI's prebuilt `theme/*.css` and `themes.css` copied as assets | same, via `@tailwindcss/vite`; the copy done with `vite-plugin-static-copy` | `daisyui` is a runtime dependency; `daisyui/functions/themeOrder` is framework-agnostic and imports as is |
 | Vitest 4 via `@angular/build:unit-test` | Vitest 4 directly, two `projects` | jsdom + browser (`@vitest/browser-playwright`) |
 | `@testing-library/angular` | `@testing-library/react` 16 + `@testing-library/jest-dom` | same `render` / `screen` API |
 | Playwright | Playwright | same config, different port |
 
 Optional: the React Compiler (`babel-plugin-react-compiler` 1.0) in `vite.config.ts` for automatic memoization. Not required for parity.
 
-`@angular/aria` is in `package.json` but not imported anywhere in `src/`, so it needs no equivalent.
+`@angular/aria` and `@angular/router` are in `package.json` but not imported anywhere in `src/` (the router provider and `app.routes.ts` were removed in `96b1a4e`), so neither needs an equivalent. Add a router when a route exists.
 
 ## Project layout
 
@@ -68,12 +71,16 @@ src/
     state/             theme-store.ts, theme-store.spec.ts
     theme-picker/      theme-picker.tsx, .test.tsx
   app/shared/
+    announcer/         announcer.ts, announcer.spec.ts
     confirmation-dialog/, text-input-dialog/
   test/                setup files, render-with-stores.tsx
-e2e/                   app, drag-drop, form-elements, grid-layout, theme   (copied)
+e2e/                   app, drag-drop, form-elements, grid-layout, keyboard, theme   (copied)
 docs/adr/              0001 rewritten for Zustand, 0002 carried over
-index.html             <html lang="en" data-theme="fantasy"> + <link rel="stylesheet" href="themes/fantasy.css">
+index.html             <html lang="en" data-theme="fantasy">, <title>DropUI – drag &amp; drop UI builder</title>,
+                       <link rel="stylesheet" href="themes/fantasy.css">
 ```
+
+`app.e2e.ts` asserts the title text and `lang="en"`.
 
 ## Stores
 
@@ -85,133 +92,250 @@ ADR 0001 is the specification for both stores. Its rules carry over one for one;
 | Components inject the store and read signals | `inject(BuilderStore)` | `useBuilderStore(selector)` / `useThemeStore(selector)` |
 | Components never change state themselves | protected state | the hooks expose only selected state and actions; `setState` is not exported |
 | Each method is one atomic update | `patchState(store, fn)` | `set((state) => ...)`; the updater bodies copy unchanged |
-| The store owns its invariants | guards inside methods | same guards (`Number.isFinite`, `clampGridSize`, `THEMES.includes`, `'text' in element`, `'value' in element`, `type === 'dropdown'`, `hasOption`) |
+| The store owns its invariants | guards inside methods | same guards (`Number.isFinite`, `clampGridSize`, `THEMES.includes`, `'text' in element`, `'value' in element`, `type === 'dropdown'`, `hasOption`, unknown `uid`) |
 | Derived data is never stored | `withComputed` | exported pure selector + memoizing hook |
-| Pure helpers above the store | module functions | copied unchanged: `createElement`, `hasOption`, `selectedValue`, `insertIntoCell`, `clampGridSize`, `isInCell`, `CELL_AXIS`, `createInitialState` |
+| Pure helpers above the store | module functions | copied unchanged: `createElement`, `hasOption`, `selectedValue`, `insertIntoCell`, `clampGridSize`, `isInCell`, `positionInCell`, `countOf`, `CELL_AXIS`, `createInitialState` |
 | Side effects in `withHooks` | `effect()` in `onInit` | `store.subscribe(...)` inside the factory |
+| The store announces its own changes | `inject(LiveAnnouncer)` as a `withMethods` default argument | an `announce(message)` function passed to the factory |
 | Stores do not inject each other | — | same; a component that needs both uses both hooks |
+
+### Announcements
+
+The Angular stores, not the components, announce canvas and theme changes, so a drag and its keyboard alternative report the same outcome. Keep that: no component calls the announcer.
+
+- `shared/announcer/announcer.ts` exports `createAnnouncer(document = window.document)`, returning `announce(message: string): void`. It appends one `<div class="sr-only" aria-live="polite" aria-atomic="true">` to `<body>` on first use and writes the message as its text. Clear the text before setting it so the same message twice in a row is spoken twice, which is what CDK's `LiveAnnouncer` does.
+- One announcer is created in `main.tsx` and passed to both factories: `createBuilderStore({ announce, initial? })`, `createThemeStore({ announce, document? })`.
+- Store specs pass `vi.fn()` and assert on it, replacing `vi.spyOn(TestBed.inject(LiveAnnouncer), 'announce')`. The e2e suite asserts the region's text with `getByText(...).toBeAttached()`, so the region has to stay in the DOM and must not be `hidden`.
+- dnd-kit ships its own live region with "picked up / dropped" messages. Silence it (`accessibility.announcements` on `DndContext` returning nothing), or the store's message competes with it.
 
 ### `BuilderStore`
 
 Port `drop-ui/src/app/features/builder/state/builder-store.ts` nearly line for line.
 
 - Actions: `setGridSize(axis, size)`, `addElement`, `updateText`, `updateOptions`, `updateValue`, `removeElement`, `moveElement`. `updateOptions` also keeps the dropdown selection valid through the `selectedValue` helper.
+- Palette labels come from `ELEMENT_LABELS` in `palette-item.ts`: the div is "Block text" and the span is "Inline text". Every user-facing name of an element type (palette, actions button, announcements) reads from that record.
+- `removeElement` and `moveElement` now look the element up first and return silently for an unknown `uid`. In Zustand: read with `get()`, call `set(...)`, read `get()` again for the announcement.
+- What each action announces, exactly as the specs and `keyboard.e2e.ts` expect:
+
+| Action | Message | Silent when |
+|---|---|---|
+| `addElement` | `{item.label} added to {cellLabel(cell)}.` | never |
+| `moveElement` to another cell | `{label} moved to {cellLabel(cell)}.` | unknown `uid` |
+| `moveElement` within its cell | `{label} moved to position {n} of {count}.` | the position did not change |
+| `removeElement` | `{label} deleted.` | unknown `uid` |
+| `setGridSize` | `Grid set to {countOf(rows, 'row')} and {countOf(columns, 'column')}.`, read after clamping | the size is not finite |
+
 - `createElement` keeps its exhaustive `switch` with no `default` branch (ADR 0002 rule 4).
 - `cells` → exported pure `selectCells(grid, canvasElements): GridCell[]` plus a `useCells()` hook that selects `grid` and `canvasElements` separately and derives with `useMemo`. Do not return a freshly built array from a Zustand selector: in v5 that re-renders forever.
-- `createBuilderStore(initial?: Partial<BuilderState>)` takes preset state so tests can mount a component against a known canvas, the equivalent of stubbing `BuilderStore` in `providers`.
+- `initial?: Partial<BuilderState>` takes preset state so tests can mount a component against a known canvas, the equivalent of stubbing `BuilderStore` in `providers`.
 
 ### `ThemeStore`
 
 Port `drop-ui/src/app/features/theme/state/theme-store.ts`.
 
 - `THEMES` (from `daisyui/functions/themeOrder`) and `createInitialState(root)` copy unchanged. There is no default-theme constant: the starting theme is read from `data-theme` on `<html>`, and a missing or unknown name falls back to `THEMES[0]` with `allThemesRequested: true`.
-- State is `{ theme, allThemesRequested }`. `loadAllThemes()` sets the flag; `setTheme` ignores names that are not in `THEMES` and otherwise sets the theme and the flag.
-- The two `withHooks` effects become: `createThemeStore(document = window.document)` writes `data-theme` once and then on every change through `store.subscribe`, and appends `<link rel="stylesheet" href="themes.css">` to `<head>` the first time `allThemesRequested` is true. The attribute goes on `<html>`, not on the shell, so Base UI portals under `<body>` are themed too (`theme.e2e.ts`, last test).
+- State is `{ theme, allThemesRequested }`. `loadAllThemes()` sets the flag; `setTheme` ignores names that are not in `THEMES` and otherwise sets the theme and the flag and announces `Theme changed to {theme}.`
+- The two `withHooks` effects become: the factory writes `data-theme` once and then on every change through `store.subscribe`, and appends `<link rel="stylesheet" href="themes.css">` to `<head>` the first time `allThemesRequested` is true. The attribute goes on `<html>`, not on the shell, so Base UI portals under `<body>` are themed too (`theme.e2e.ts`: "a picked theme also restyles overlays rendered outside the app root").
 - `index.html` is the only place that names the default theme: `data-theme="fantasy"` on `<html>` and a `<link>` to `themes/fantasy.css`, so the first paint is themed before the store exists. `styles.css` builds no theme.
 - `ThemePicker` calls `loadAllThemes()` when its menu opens (`theme.e2e.ts`: "loads the other themes when the theme list is opened").
 
 ## Models
 
-`canvas-element.ts`, `grid-layout.ts`, `palette-item.ts` and `dropdown-option.ts` are plain TypeScript and copy verbatim. ADR 0002 (discriminated union) applies unchanged except rule 8, which becomes: `DroppedElement` narrows with a `switch (element.type)` in TSX and ends with `default: return assertNever(element)`.
+`canvas-element.ts`, `grid-layout.ts`, `palette-item.ts` and `dropdown-option.ts` are plain TypeScript and copy verbatim, including the two new exports: `cellLabel({ row, column })` → `Row N, column M` (one-based) and `ELEMENT_LABELS: Record<ElementType, string>`. ADR 0002 (discriminated union) applies unchanged except rule 8, which becomes: `DroppedElement` narrows with a `switch (element.type)` in TSX and ends with `default: return assertNever(element)`.
 
 ## Drag & drop
 
 | CDK | dnd-kit |
 |---|---|
-| `CdkDropListGroup` on the shell | one `<DndContext>` in `BuilderShell`, `PointerSensor` with `activationConstraint: { distance: 5 }` |
-| palette `cdkDrag` + `cdkDropListHasAnchor` + `acceptNothing` | `useDraggable` per palette item, rendered through `<DragOverlay>` so the original stays put; the palette registers no droppable |
-| cell `cdkDropList` + `[cdkDropListData]` | `useDroppable({ id, data: cell })` wrapping a `<SortableContext>` of the cell's uids |
+| `CdkDropListGroup` on the shell | one `<DndContext>` in `BuilderShell`, `PointerSensor` only, with `activationConstraint: { distance: 5 }`. No `KeyboardSensor`: Enter and Space on a palette item or an actions button open its menu |
+| palette `cdkDrag` + `cdkDropListHasAnchor` + `acceptNothing` | `useDraggable` per palette `<li>`, rendered through `<DragOverlay>` so the original stays put; the palette registers no droppable |
+| cell `cdkDropList` + `cdkDropListOrientation="mixed"` + `[cdkDropListData]` | `useDroppable({ id, data: cell })` wrapping a `<SortableContext>` of the cell's uids with `rectSortingStrategy` (spans sit side by side, so a vertical-list strategy is wrong) |
 | element `cdkDrag` | `useSortable({ id: uid, data: element })` on the wrapper `<div>` |
 | `(cdkDropListDropped)` → `Canvas.drop` | `onDragEnd` → pure `resolveDrop(active, over, cells)` in `canvas-drop.ts` returning `{ kind: 'add' \| 'move', cell, index }`, then `addElement` / `moveElement` |
 | `.cdk-drop-list-receiving` / `-dragging` in `styles.css` | `isOver` / `isDragging` from the hooks → conditional classes, including `z-10` on the hovered cell (cells overlap their neighbours' borders) |
-| `(mousedown)` / `(touchstart)` `stopPropagation()` on the menu button **and on every form control** | `onPointerDown={(e) => e.stopPropagation()}` on the same elements, shared as one `noDrag` props object |
+| `.cdk-drag-animating` only under `prefers-reduced-motion: no-preference`; `motion-reduce:transition-none` on cells | a `usePrefersReducedMotion()` hook (`matchMedia`): `dropAnimation={null}` on `DragOverlay` and `transition: null` in `useSortable` when it is true; the cell class copies as is |
+| `(mousedown)` / `(touchstart)` `stopPropagation()` on the actions button **and on every form control** | `onPointerDown={(e) => e.stopPropagation()}` on the same elements, shared as one `noDrag` props object |
+
+Spread only `listeners` and `setNodeRef` from `useDraggable` / `useSortable`, not `attributes`. `attributes` adds `role="button"`, `tabIndex={0}`, `aria-roledescription` and `aria-describedby`, which would make every wrapper a tab stop and change the accessibility tree the tests read. Keyboard users get the menus below instead.
 
 `resolveDrop` keeps the existing rule that only canvas elements carry `paletteUid`. Drop index: over an element → that element's index in its cell; over the cell itself → end of the cell. For a same-cell reorder this matches `moveElement`'s "index counted without the element itself".
 
-Two tests in `form-elements.e2e.ts` pin the `noDrag` behaviour from both sides: a drag that starts on the `<input>` must not move the element (and typing in it must work), while a drag that starts on the wrapper beside the control must move it.
+Tests that pin drag behaviour beyond the basics:
+
+- `form-elements.e2e.ts`: a drag that starts on the `<input>` must not move the element (and typing in it must work), while a drag that starts on the wrapper beside the control must move it.
+- `drag-drop.e2e.ts`: "still drops and reorders elements when reduced motion is requested", and "lays dropped spans out next to each other and a div on a line of its own".
+- `keyboard.e2e.ts`: "announces an element dropped with the pointer the same way" also asserts that no menu is open after a palette drag (see `ElementPalette`).
 
 Cross-cell insertion preview (the gap CDK shows while hovering another list) needs an `onDragOver` projection held in local state. Do it after the e2e suite is green; it is polish, not part of the contract.
+
+## Keyboard alternative and focus
+
+Everything a drag can do is also reachable from a menu. Both paths call the same store actions, so the announcements are identical.
+
+| Drag | Menu | Store call |
+|---|---|---|
+| palette item → cell | palette button "Add {label}" → menu "Add {label} to" → cell | `addElement(item, cell, cell.elements.length)` |
+| reorder within a cell | actions menu → "Move earlier" / "Move later" | `moveElement(uid, ownCell, position ∓ 1)` |
+| move to another cell | actions menu → "Move to cell" submenu → cell | `moveElement(uid, cell, cell.elements.length)` |
+
+Focus rules, each pinned by `keyboard.e2e.ts`:
+
+| After | Focus goes to | How in React |
+|---|---|---|
+| picking a cell from a palette menu, or dismissing it with Escape | the palette button | Base UI returns focus to the trigger by default |
+| moving an element (within or across cells) | that element's actions button, in its new place | `DroppedElement` calls `onMoved()`; `Canvas` records the uid and focuses the button in an effect after the commit |
+| saving or cancelling an edit dialog, or cancelling a deletion | the element's actions button | `finalFocus={actionsButtonRef}` on the dialog's `Popup`: the menu item that opened it is gone by then |
+| confirming a deletion | the cell the element was in | `DroppedElement` calls `onRemoved()`; `Canvas` focuses the cell (`tabIndex={-1}`: focusable, not a tab stop) after the commit |
+
+`Canvas` keeps two ref maps for this, actions buttons by uid and cell elements by `row:column`, plus one `pendingFocus` state consumed by a `useEffect`. An element that changes cell is unmounted and remounted (React cannot reparent), so its old button no longer exists and focus has to be placed explicitly. For a move the menu closes at the same moment and Base UI will try to return focus to the old trigger: if that lands after the effect, set `finalFocus={false}` on the actions menu's `Popup` while a move is pending. The Angular `canvas.spec.ts` case "leaves focus alone until then, as the dialog that asked is still handing it back" describes the same ordering for deletion: the cell is focused only after the removal has rendered.
 
 ## Components
 
 - Angular host elements become real wrapper elements. `DroppedElement` renders `<div data-uid data-element-type class="group relative ...">` as the direct parent of the `data-testid="dropped-*"` node (tests and e2e read `data-uid` from that parent).
-- `BuilderShell`'s `:host` grid in `builder-shell.css` becomes a `.builder-shell` class on the root `<div>`; the named-area rules are unchanged. The header gains `<ThemePicker className="ml-auto" />`.
-- Keep every role, `aria-label`, `data-testid`, `data-row` / `data-column` exactly:
+- `BuilderShell`'s `:host` grid in `builder-shell.css` becomes a `.builder-shell` class on the root `<div>`; the named-area rules are unchanged. The header holds `<h1>DropUI</h1>` (was a `<span>`) and `<ThemePicker className="ml-auto" />`.
+- Secondary text is `text-base-content/70` everywhere (was `/50` and `/60`), for contrast: panel headings, the grid "×" row, the palette `<code>` tags, the empty-cell hint.
+- Keep every role, name, `data-testid`, `data-row` / `data-column` exactly:
 
 | Element | Role and name |
 |---|---|
-| header | `banner` |
-| sidebar | `complementary` "Sidebar" (renamed from "Element palette") |
-| canvas | `region` "Canvas"; cells are `group` "Row N, column M" with `data-testid="canvas-cell"` |
+| header | `banner`, containing `heading` level 1 "DropUI" |
+| sidebar | `complementary` "Sidebar"; `heading` level 2 "Layout", then "Elements" (`app.e2e.ts` asserts all three headings in this order) |
 | grid inputs | `spinbutton` "Grid rows" / "Grid columns" |
-| element menu | `button` "Element actions"; `menuitem` "Edit text" / "Edit options" / "Delete element" |
-| theme picker | `button` "Change theme"; `menu` "Themes"; `menuitemradio` per theme |
-| dialogs | `dialog` named by its title |
+| palette | `list` labelled by the "Elements" heading (`aria-labelledby="element-palette-heading"`); each `listitem` holds a `button` "Add {label}" |
+| palette menu | `menu` "Add {label} to"; one `menuitem` per cell, named by `cellLabel`, row by row |
+| canvas | `region` "Canvas"; cells are `group` named by `cellLabel` with `data-testid="canvas-cell"` and `tabindex="-1"` |
+| element actions | `button` "{label} actions" (e.g. "Block text actions", was "Element actions") and a `menu` with the same name |
+| actions menu items, in this order | "Edit text", "Edit options", "Move earlier", "Move later", "Move to cell", "Delete element" |
+| move submenu | `menu` "Move to cell"; one `menuitem` per other cell |
+| theme picker | `button` "Change theme", described by "Current theme: {theme}"; `menu` "Themes"; `menuitemradio` per theme |
+| dialogs | `dialog` named by its title and described by its description; the confirmation is an `alertdialog` |
+
+### `Canvas`
+
+- A cell's classes are `canvas-drop-zone -mt-0.5 -ml-0.5 min-h-24 border-2 border-dashed border-base-300 bg-base-100 p-6 transition-colors motion-reduce:transition-none`. It is `flex flex-col` only while empty, to centre the "Drop elements here" hint. With elements it is plain block flow, which is what lets spans share a line.
+- Passes each `DroppedElement` its `index` and `siblingCount` (it is already mapping over `cell.elements`), plus `onMoved`, `onRemoved` and the ref callback for its actions button. That keeps `DroppedElement` from subscribing to the whole `canvasElements` array just to find its own position.
+- Owns the focus handling described above.
 
 ### `DroppedElement`
 
-Six render branches, with `HOVER_OUTLINE` copied unchanged:
+Six render branches. `HOVER_OUTLINE` is now `OUTLINE` and carries a `focus-within:` twin of every `hover:` class, so keyboard users get the same cue; it copies unchanged. The wrapper is `group relative mb-2 cursor-grab rounded-box border border-transparent p-1 pr-10` plus `mr-2 inline-block align-top` for a span and `block` for everything else. The type badge is `aria-hidden` and shows on `group-focus-within:` as well as `group-hover:`.
 
 | Type | Renders | Test id | Notes |
 |---|---|---|---|
 | `div` | `<div>` with text | `dropped-div` | |
-| `span` | `<span>` with text | `dropped-span` | |
+| `span` | `<span>` with text | `dropped-span` | wrapper is inline-block |
 | `text-input` | `<input type="text">`, `aria-label="Text input"` | `dropped-text-input` | `text` is the placeholder; controlled: `value={element.value}`, `onChange` → `updateValue`; `noDrag` |
 | `textfield` | `<textarea>`, `aria-label="Textfield"` | `dropped-textfield` | same |
 | `datepicker` | `<input type="date">`, `aria-label="Datepicker"` | `dropped-datepicker` | controlled the same way; `noDrag` |
 | `dropdown` | `<select>`, `aria-label="Dropdown"` | `dropped-dropdown` | one `<option>` per entry, keyed by index; controlled: `value={element.value}`, `onChange` → `updateValue`; `noDrag` |
 
-Control values are store state, not DOM state: an element is unmounted and remounted when it changes cell, and three tests in `form-elements.e2e.ts` check that what was typed, picked or selected survives a move and a grid shrink.
+Control values are store state, not DOM state: an element is unmounted and remounted when it changes cell, and tests in `form-elements.e2e.ts` and `keyboard.e2e.ts` check that what was typed, picked or selected survives a move and a grid shrink.
 
-Menu items are conditional: "Edit text" when `'text' in element`, "Edit options" when `element.type === 'dropdown'`, "Delete element" always. The component holds `useState<'edit-text' | 'edit-options' | 'delete' | null>` and renders the matching dialog. Handlers take the narrowed element (`TextCanvasElement | TextControlCanvasElement`, `DropdownCanvasElement`), as ADR 0002 rule 7 requires.
+Actions menu (Base UI `Menu`, the `Popup` carrying `aria-label={actionsLabel}`):
+
+- "Edit text" when `'text' in element`; "Edit options" when `element.type === 'dropdown'`.
+- "Move earlier" and "Move later" only when `siblingCount > 1`. "Move earlier" is disabled for the first element and "Move later" for the last, with DaisyUI's `menu-disabled` on the `<li>`. A disabled item must stay reachable with the arrow keys and pressing Enter on it must leave the menu open: `keyboard.e2e.ts` asserts `toBeFocused()` and `toBeDisabled()` on the same item. Confirm that Base UI's `disabled` on `Menu.Item` behaves this way (`aria-disabled`, still highlightable); if it removes the item from keyboard navigation, set `aria-disabled` and guard the handler by hand.
+- "Move to cell" only when the grid has another cell: `Menu.SubmenuRoot` + `Menu.SubmenuTrigger`, opened with ArrowRight, listing every cell but the element's own. Picking a cell closes both menus.
+- "Delete element" always, last.
+- An element alone in a 1×1 grid therefore shows just "Edit text" and "Delete element" (pinned by e2e).
+
+The component holds `useState<'edit-text' | 'edit-options' | 'delete' | null>` and renders the matching dialog, each with `finalFocus` pointing at the actions button. Handlers take the narrowed element (`TextCanvasElement | TextControlCanvasElement`, `DropdownCanvasElement`), as ADR 0002 rule 7 requires.
+
+### `ElementPalette`
+
+Each item is now a `<button type="button" aria-label="Add {label}">` inside its `<li data-uid>`, showing the label and `<code>&lt;{type}&gt;</code>`. Keep the `<code>`: the drag tests find the div and span items with `hasText: 'Div'` / `'Span'`, which now only match that tag text. The button has `focus-visible:ring-2 focus-visible:ring-primary`.
+
+The button is at once a drag handle and a menu trigger, and the two must not interfere:
+
+- A click, Enter or Space opens the menu of cells; the first cell is focused on a keyboard open.
+- A drag must not leave a menu open. Make the menu controlled (`open` / `onOpenChange`, one `openUid` in the palette) and close it from `useDndMonitor({ onDragStart })`. This holds whether Base UI's trigger opens on pointer down or on click, which the docs do not state.
+- Picking a cell calls `addElement(item, cell, cell.elements.length)`; Base UI then closes the menu and returns focus to the button.
 
 ### `ThemePicker`
 
 Base UI `Menu` with a `RadioGroup` whose value is the store's theme; each theme is a `RadioItem` (role `menuitemradio`, `aria-checked`). The popup carries `aria-label="Themes"`. The four-dot swatch is a small component used in the trigger and, wrapped in `data-theme={theme}`, in each row; the check icon is `invisible` unless the row is current.
 
-The Angular component calls `menu.setActiveMenuItem(selected)` in an effect so the list opens scrolled to the current theme (`theme.e2e.ts`: "opens the theme list scrolled to the current theme", asserted with `toBeInViewport`). In React: when the menu opens, focus the checked item, or call `scrollIntoView({ block: 'nearest' })` on it from a ref. Check the Base UI `Menu` docs for a built-in way to set the initially highlighted item before writing the ref version.
+- `RadioItem` needs `closeOnClick`: Base UI keeps the menu open after a radio pick by default, CDK closes it, and `theme.e2e.ts` asserts the menu is gone and the trigger focused after Enter.
+- The trigger has `aria-describedby="theme-picker-current"`, pointing at a sibling `<span id="theme-picker-current" hidden>Current theme: {theme}</span>`. Without it the button tells the current theme only once its list is open.
+- The list must open with the checked item **focused**, not merely scrolled into view: `theme.e2e.ts` asserts `toBeFocused()` on `fantasy` after a keyboard open and `toBeInViewport()` after a click. Base UI focuses the first item; the docs show no prop for the initial item, so focus the checked item from a ref when the menu opens.
+- Typeahead must work ("dra" focuses `dracula`). Base UI matches on the item's text; pass `label={theme}` on each `RadioItem` so the swatch markup cannot get in the way.
 
 ### `LayoutPanel` (the one real behavioural trap)
 
-React's `onChange` on an `<input>` is the native `input` event and fires per keystroke. The Angular code deliberately commits on native `change` so typing "12" does not pass through "1" and collapse the grid. In React: uncontrolled inputs (`defaultValue`, a `ref`), one `commit(axis, input)` on a native `change` listener attached through the ref (fallback: `onBlur` + Enter), then `show(axis, input)` writes `input.value` back from the store. `grid-layout.e2e.ts` ("applies a typed grid size once it is committed") guards this.
+React's `onChange` on an `<input>` is the native `input` event and fires per keystroke. The Angular code deliberately commits on native `change` so typing "12" does not pass through "1" and collapse the grid. In React: uncontrolled inputs (`defaultValue`, a `ref`), one `commit(axis, input)` on a native `change` listener attached through the ref (fallback: `onBlur` + Enter), then `show(axis, input)` writes `input.value` back from the store. `grid-layout.e2e.ts` ("applies a typed grid size once it is committed") guards this, and `keyboard.e2e.ts` sets the grid by typing, Tab and Enter, so Enter has to commit too.
 
 ## Dialogs
 
-All three become controlled Base UI `Dialog`s with `open` and `onOpenChange`; `Dialog.Title` gives the accessible name. This replaces the `open*Dialog(dialog, options): Observable` helpers and removes RxJS. Each dialog's form body is a child component that mounts only while the dialog is open, so `useState(initialValue)` resets on every open (the `linkedSignal` equivalent) without a syncing effect.
+`TextInputDialog` and `DropdownOptionsDialog` become controlled Base UI `Dialog`s; `ConfirmationDialog` becomes a controlled `AlertDialog` (`@base-ui/react/alert-dialog`, role `alertdialog`), because it interrupts to ask about something that cannot be undone. All take `open` and `onOpenChange`. This replaces the `open*Dialog(dialog, options): Observable` helpers and removes RxJS. Each dialog's form body is a child component that mounts only while the dialog is open, so `useState(initialValue)` resets on every open (the `linkedSignal` equivalent) without a syncing effect.
+
+Labelling: render the heading as `Dialog.Title` and the description as `Dialog.Description`, mounted only when a description is given. Base UI then references each from the popup, which is all `shared/dialog-labelling.ts` does by hand for CDK (`labelledDialogConfig`, `dialogTitleId`, `dialogDescriptionId`), so that file and its spec have nothing to port. The requirement it encodes still holds and is tested: the dialog is named by its visible heading, described by its visible description, and references no description when there is none (`toHaveAccessibleDescription` in `keyboard.e2e.ts`, "should be described by its description" in each dialog's test).
 
 | Dialog | Props besides `open` / `onOpenChange` / `title` | Behaviour to keep |
 |---|---|---|
-| `ConfirmationDialog` | `description?`, `confirmLabel?` (default `'Confirm'`), `onConfirm` | Cancel has initial focus |
-| `TextInputDialog` | `description?`, `value?`, `onSubmit(text)` | textbox "Text" has initial focus; Save disabled while `!text.trim()` |
-| `DropdownOptionsDialog` | `description?`, `options?`, `onSubmit(options)` | see below |
+| `ConfirmationDialog` | `description?`, `confirmLabel?` (default `'Confirm'`), `finalFocus?`, `onConfirm` | `alertdialog`; Cancel, the safe choice, has initial focus |
+| `TextInputDialog` | `description?`, `value?`, `finalFocus?`, `onSubmit(text)` | textbox "Text" has initial focus; Save disabled while `!text.trim()`; Enter submits |
+| `DropdownOptionsDialog` | `description?`, `options?`, `finalFocus?`, `onSubmit(options)` | see below |
+
+`finalFocus` is the port of the new `restoreFocus` option: a ref to the element that takes focus when the dialog closes, passed straight to the `Popup`. When it is omitted, focus returns to whatever had it when the dialog opened.
 
 `DropdownOptionsDialog` lives in the builder feature, not in `shared/`, because it edits a builder model type. It is a dynamic list of rows:
 
 - State: `useState<Row[]>` where `Row = { id, text, value }`. The `id` (`crypto.randomUUID()`) exists only as the React `key`: index keys would move typed values and focus to the wrong row after a delete. Rows are stripped back to `{ text, value }` on submit, the same job `copyOption` does today.
-- Starts with the given options, or one blank row when there are none.
+- Starts with the given options, or one blank row when there are none. "Option 1 text" has initial focus.
 - `invalid = rows.some((row) => !row.text.trim() || !row.value.trim())`; Save is disabled while invalid, and submit is a no-op.
 - "Add option" appends a blank row and focuses its text input. "Delete option N" removes the row and focuses the previous row's text input, so focus does not fall out of the dialog. The first row's delete button is disabled.
 - Labels: "Option N text", "Option N value", "Delete option N" (one-based).
 - Never mutates the `options` prop (the spec passes frozen arrays).
 
+## Styles and bundle size
+
+- Tailwind's automatic source detection is off in the Angular app, because it scans the whole repository and every word in the docs and tests that names a daisyUI component ships that component. The same applies to a Vite project. `styles.css` starts:
+
+  ```css
+  @import 'tailwindcss' source(none);
+  @source './**/*.{ts,tsx}';
+  @source not './**/*.{spec,test}.{ts,tsx}';
+  @plugin "daisyui" {
+    themes: false;
+  }
+  ```
+
+  Add `@source '../index.html'` only if `index.html` ever carries utility classes.
+- The CDK imports (`overlay-prebuilt.css`, `a11y-prebuilt.css`) and the `.cdk-*` rules have no counterpart: Base UI positions its own popups, `sr-only` hides the live region, and the drag feedback is conditional classes.
+- The Angular app loads `TextInputDialog` and `DropdownOptionsDialog` with `import()` on first use, because they are the only users of signal forms (about 60 kB). The React dialogs use `useState` and the same Base UI `Dialog` code the confirmation dialog already pulls in, so there is nothing comparable to defer. Import them statically; if the `vite build` report later shows a reason, `React.lazy` is the mechanism.
+
 ## Tests
 
 - `vitest.config.ts` with two projects: `unit` (`src/**/*.spec.ts`, jsdom) and `components` (`src/**/*.test.tsx`, Chromium via `@vitest/browser-playwright`), reusing the two setup files.
 - npm scripts keep the same names so the commands do not change: `test` → `vitest --project unit`, `test:components` → `vitest --project components`, `e2e` → `playwright test`.
-- Store specs: `builder-store.spec.ts` and `theme-store.spec.ts` replace `TestBed.inject(...)` with the factories and signal reads with `store.getState()` / `selectCells(...)`. `createThemeStore` takes a detached document so the spec can seed `data-theme` and assert the attribute write and the appended stylesheet link.
-- Component class-logic specs become pure-function specs: `canvas.spec.ts` → `canvas-drop.spec.ts` for `resolveDrop`; the `dropped-element.spec.ts` hover-outline cases → the `HOVER_OUTLINE` mapping. Spec cases that drove a dialog's form model or `dialogRef.close` directly (`dropdown-options-dialog.spec.ts`, `text-input-dialog.spec.ts`, `confirmation-dialog.spec.ts`, the rest of `dropped-element.spec.ts`, `layout-panel.spec.ts`) move to the component's `*.test.tsx` as observable behaviour, asserting on the `onSubmit` / `onConfirm` callback prop, which the testing guide already allows for parent-supplied handlers. The `open*Dialog` helper specs have nothing to port.
-- Component tests: `src/test/render-with-stores.tsx` wraps `render` in both store providers (and `DndContext` where needed) with preset state. Assertions in the existing `*.test.ts` files port with only the mount helper changed. Fixtures are built per element kind, never by spreading one kind into another (ADR 0002, "Costs").
-- E2E: copy the five files. `playwright.config.ts` is the same except `webServer.command: 'npm run dev'` and port **5173** (not 4200), so `reuseExistingServer` can never attach to a running Angular dev server.
+- Store specs: `builder-store.spec.ts` and `theme-store.spec.ts` replace `TestBed.inject(...)` with the factories and signal reads with `store.getState()` / `selectCells(...)`. The `announcements` cases assert on the `vi.fn()` passed as `announce`. `createThemeStore` takes a detached document so the spec can seed `data-theme` and assert the attribute write and the appended stylesheet link.
+- New `announcer.spec.ts`: creates the region once, writes the message, re-announces a repeated message.
+- Component class-logic specs become pure-function specs or move to component tests:
+
+| Angular spec | Goes to |
+|---|---|
+| `canvas.spec.ts` (`drop`) | `canvas-drop.spec.ts` for `resolveDrop` |
+| `canvas.spec.ts` (`focusCell`, `focusElement`) | `canvas.test.tsx`, "keyboard focus" cases, which already exist on the Angular side |
+| `dropped-element.spec.ts` (outline, `display`) | `dropped-element.spec.ts` for the `OUTLINE` and display mappings |
+| `dropped-element.spec.ts` (editing, moving, deleting, `focusActions`, focus return) | `dropped-element.test.tsx` as observable behaviour |
+| `element-palette.spec.ts` (`add` puts the item at the end of the cell) | `element-palette.test.tsx`; "lets nothing be dropped onto the palette" → a `resolveDrop` case |
+| `dropdown-options-dialog.spec.ts`, `text-input-dialog.spec.ts`, `confirmation-dialog.spec.ts`, `layout-panel.spec.ts` | the component's `*.test.tsx`, asserting on the `onSubmit` / `onConfirm` callback prop, which the testing guide already allows for parent-supplied handlers |
+| `dialog-labelling.spec.ts`, the `open*Dialog` helper cases | nothing to port |
+
+- Component tests: `src/test/render-with-stores.tsx` wraps `render` in both store providers (and `DndContext` where needed) with preset state and a real announcer by default, so tests such as `theme-picker.test` "should announce the picked theme" can read the live region. Assertions in the existing `*.test.ts` files port with only the mount helper changed. Fixtures are built per element kind, never by spreading one kind into another (ADR 0002, "Costs").
+- E2E: copy the six files. `playwright.config.ts` is the same except `webServer.command: 'npm run dev'` and port **5173** (not 4200), so `reuseExistingServer` can never attach to a running Angular dev server.
 - Tests carry no comments, per `CLAUDE.md`.
 
 ## Build order
 
-1. Scaffold: `npm create vite@latest drop-ui-react -- --template react-ts` in `C:\Users\telis\Repos`; add Tailwind 4 + DaisyUI (`themes: false`, with the prebuilt theme files copied to `themes/` and `themes.css`), Vitest projects, Playwright. Port `.claude/CLAUDE.md`, `guides/testing.md`, the `testing` and `review` skills and both ADRs, rewritten for React: PascalCase components instead of the `dui` selector prefix, Zustand instead of SignalStore, Base UI + dnd-kit instead of CDK. The no-commit rule, the three-suites rule and the Comments section carry over unchanged. The `angular-developer` and `angular-new-app` skills are not ported.
-2. Models, both stores and their specs. Unit suite green.
-3. The two shared dialogs and the builder's dropdown options dialog, with their tests.
-4. `ThemePicker`, `LayoutPanel`, `ElementPalette`, `DroppedElement` (all six types), `Canvas`, `BuilderShell`, `App`, without drag wiring. Component tests green; `app.e2e.ts` and `theme.e2e.ts` green.
-5. Drag & drop: `DndContext`, `resolveDrop` + spec, overlay, drop-zone styling, `noDrag` on controls. `drag-drop`, `form-elements` and `grid-layout` e2e green.
+1. Scaffold: `npm create vite@latest drop-ui-react -- --template react-ts` in `C:\Users\telis\Repos`; add Tailwind 4 + DaisyUI (`source(none)`, `themes: false`, with the prebuilt theme files copied to `themes/` and `themes.css`), Vitest projects, Playwright. Port `.claude/CLAUDE.md`, `guides/testing.md`, the `testing`, `review` and `interview` skills and both ADRs, rewritten for React: PascalCase components instead of the `dui` selector prefix, Zustand instead of SignalStore, Base UI + dnd-kit instead of CDK. The no-commit rule, the three-suites rule and the Comments section carry over unchanged. The `angular-developer` and `angular-new-app` skills are not ported.
+2. Models, the announcer, both stores and their specs. Unit suite green.
+3. The two shared dialogs and the builder's dropdown options dialog, with their tests, including labelling and `finalFocus`.
+4. `ThemePicker`, `LayoutPanel`, `ElementPalette` (with its add menu), `DroppedElement` (all six types, full actions menu), `Canvas` (with focus handling), `BuilderShell`, `App`, without drag wiring. Component tests green; `app.e2e.ts`, `theme.e2e.ts` and `keyboard.e2e.ts` green except its last test, the only one that drags.
+5. Drag & drop: `DndContext`, `resolveDrop` + spec, overlay, drop-zone styling, `noDrag` on controls, reduced motion, closing the palette menu on drag start. `drag-drop`, `form-elements`, `grid-layout` and the rest of `keyboard` e2e green.
 6. Cross-cell preview polish.
+
+Step 4 is larger than before, but it now yields a fully usable builder with no drag code at all, which makes the keyboard suite a useful checkpoint before dnd-kit goes in.
 
 ## Out of scope
 
@@ -223,14 +347,17 @@ All three become controlled Base UI `Dialog`s with `open` and `onOpenChange`; `D
 
 In `drop-ui-react`:
 
-1. `npm run build` (type check + production build) passes.
+1. `npm run build` (type check + production build) passes. Check the CSS output for daisyUI components the app does not use (tabs, steps, table): their presence means source detection is scanning too much.
 2. `npm test -- --watch=false`, `npm run test:components -- --watch=false`, `npm run e2e` all green.
 3. Manual pass on `npm run dev`:
    - Grid: set 2×2; type "12" into rows and confirm the grid does not collapse mid-typing; shrink to 1×1 and confirm no element is lost.
-   - Drag: drop each of the six element types into cells, reorder within a cell, move across cells.
+   - Drag: drop each of the six element types into cells, reorder within a cell, move across cells. Two spans sit on one line; a div takes its own.
    - Form controls: type into a dropped text input and pick a date without the element starting to drag; drag the same element by its wrapper to another cell and confirm the value is still there.
    - Edit text on a div and on a text input (placeholder changes); Save disabled when blank.
    - Dropdown: add two options, delete one (focus moves to the previous row), save, reopen and confirm the rows are still there.
    - Delete with cancel and with confirm.
-   - Theme: open the picker (current theme is checked and in view), pick `dracula`, confirm the header, canvas and an open menu or dialog all restyle.
-4. Side by side with the Angular app on port 4200: same roles and same behaviour for each step above.
+   - Theme: open the picker (current theme is checked, focused and in view), pick `dracula`, confirm the header, canvas and an open menu or dialog all restyle.
+   - Keyboard only, mouse unplugged: Tab to the palette, add an element to a chosen cell, move it earlier and later, move it to another cell, edit it, delete it. After every step focus is somewhere sensible (the table under "Keyboard alternative and focus") and never on `<body>`.
+   - Screen reader (NVDA or Narrator): each add, move, delete, grid change and theme change is spoken once, with the same wording for a drag as for its menu alternative; dialogs read their title and description on open.
+   - Reduced motion (DevTools → Rendering → emulate `prefers-reduced-motion: reduce`): a dropped element lands at once, with no slide.
+4. Side by side with the Angular app on port 4200: same roles, names and behaviour for each step above.

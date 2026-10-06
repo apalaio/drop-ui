@@ -19,6 +19,7 @@ The user may provide an argument:
 - **Correctness & simplicity** — does the code do what it's supposed to do, in a simple and efficient way? Is it overengineered?
 - **Scalability** — would the code scale well given more users? A known limitation is that the codebase is not supposed to be enterprise ready, so judge the frontend only.
 - **Standards & principles** — does it follow industry standards and principles such as YAGNI and DRY?
+- **Framework idiom** — is the approach idiomatic to the framework and libraries this implementation is built on? Identify them from the code and its dependencies rather than assuming. Does it lean on what they already provide, or does it fight them, reimplement built-ins, or carry over patterns from another framework or an older version?
 - **Reasoning** — can the architectural decisions be reasoned about?
 
 ## Steps
@@ -41,7 +42,7 @@ The user may provide an argument:
 
 For each one:
 
-1. The metric it falls under (correctness & simplicity, scalability, standards & principles, reasoning)
+1. The metric it falls under (correctness & simplicity, scalability, standards & principles, framework idiom, reasoning)
 2. File reference
 3. What the answer missed, and what a stronger answer would have covered
 
