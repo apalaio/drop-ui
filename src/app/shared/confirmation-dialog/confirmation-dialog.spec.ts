@@ -1,4 +1,4 @@
-import { Dialog, DialogRef } from '@angular/cdk/dialog';
+import { Dialog, DialogConfig, DialogRef } from '@angular/cdk/dialog';
 import { TestBed } from '@angular/core/testing';
 import { Observable, of } from 'rxjs';
 import { ConfirmationDialog, openConfirmationDialog } from './confirmation-dialog';
@@ -39,13 +39,39 @@ describe('openConfirmationDialog', () => {
     return { open, result };
   }
 
-  it('opens the dialog with the given inputs, labelled by its title', () => {
+  function configOf(open: ReturnType<typeof vi.fn>): DialogConfig & { bindings: unknown[] } {
+    return (open.mock.calls[0] as unknown[])[1] as DialogConfig & { bindings: unknown[] };
+  }
+
+  it('opens the dialog with the given inputs', () => {
     const { open } = openWith(of(undefined));
 
-    const [component, config] = open.mock.calls[0] as unknown as [unknown, { ariaLabel: string; bindings: unknown[] }];
-    expect(component).toBe(ConfirmationDialog);
-    expect(config.ariaLabel).toBe('Delete element');
-    expect(config.bindings).toHaveLength(3);
+    expect((open.mock.calls[0] as unknown[])[0]).toBe(ConfirmationDialog);
+    expect(configOf(open).bindings).toHaveLength(3);
+  });
+
+  it('opens as an alert dialog, labelled by its title and described by its description', () => {
+    const { open } = openWith(of(undefined));
+    const { id, role, ariaLabelledBy, ariaDescribedBy } = configOf(open);
+
+    expect(role).toBe('alertdialog');
+    expect(ariaLabelledBy).toBe(`${id}-title`);
+    expect(ariaDescribedBy).toBe(`${id}-description`);
+  });
+
+  it('returns focus to the element that had it unless told otherwise', () => {
+    const { open } = openWith(of(undefined));
+
+    expect(configOf(open).restoreFocus).toBe(true);
+  });
+
+  it('returns focus to the given element', () => {
+    const open = vi.fn(() => ({ closed: of(undefined) }));
+    const restoreFocus = document.createElement('button');
+
+    openConfirmationDialog({ open } as unknown as Dialog, { title: 'Delete element', restoreFocus });
+
+    expect(configOf(open).restoreFocus).toBe(restoreFocus);
   });
 
   it('emits true when the user confirmed', () => {

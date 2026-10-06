@@ -1,5 +1,5 @@
-import { signal } from '@angular/core';
-import { render, screen, within } from '@testing-library/angular';
+import { computed, signal } from '@angular/core';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/angular';
 import { CanvasElement } from '../models/canvas-element';
 import { GridCell, GridLayout } from '../models/grid-layout';
 import { BuilderStore } from '../state/builder-store';
@@ -123,6 +123,56 @@ describe(Canvas.name, () => {
       it('should render no elements', () => {
         expect(screen.queryAllByTestId('dropped-div').length).toBe(0);
       });
+    });
+  });
+
+  describe('keyboard focus', () => {
+    const actions = 'Block text actions';
+    const leftName = 'Row 1, column 1';
+    const rightName = 'Row 1, column 2';
+
+    beforeEach(async () => {
+      const cells = signal([cell(0, 0, [first]), cell(0, 1)]);
+      await render(Canvas, {
+        providers: [
+          {
+            provide: BuilderStore,
+            useValue: {
+              grid: signal({ rows: 1, columns: 2 }),
+              cells,
+              canvasElements: computed(() => cells().flatMap((gridCell) => gridCell.elements)),
+              moveElement: () => cells.set([cell(0, 0), cell(0, 1, [first])]),
+              removeElement: () => cells.set([cell(0, 0), cell(0, 1)]),
+            },
+          },
+        ],
+      });
+      fireEvent.click(screen.getByRole('button', { name: actions }));
+      await screen.findByRole('menu', { name: actions });
+    });
+
+    it('should not make the cells tab stops', () => {
+      const tabIndexes = screen.getAllByTestId('canvas-cell').map((canvasCell) => canvasCell.tabIndex);
+
+      expect(tabIndexes).toEqual([-1, -1]);
+    });
+
+    it('should follow an element moved to another cell', async () => {
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Move to cell' }));
+      fireEvent.click(await screen.findByRole('menuitem', { name: rightName }));
+
+      const right = await screen.findByRole('group', { name: rightName });
+
+      await waitFor(() => expect(within(right).getByRole('button', { name: actions })).toHaveFocus());
+    });
+
+    it('should move to the cell an element was deleted from', async () => {
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Delete element' }));
+      await screen.findByRole('alertdialog', { name: 'Delete element' });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
+      await waitFor(() => expect(screen.getByRole('group', { name: leftName })).toHaveFocus());
     });
   });
 });

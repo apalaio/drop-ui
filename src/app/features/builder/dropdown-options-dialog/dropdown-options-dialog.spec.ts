@@ -71,7 +71,7 @@ describe('DropdownOptionsDialog', () => {
 });
 
 describe('openDropdownOptionsDialog', () => {
-  it('opens the dialog with the given inputs, labelled by its title', () => {
+  it('opens the dialog with the given inputs, labelled by its title and described by its description', () => {
     const dialog = TestBed.inject(Dialog);
     const open = vi.spyOn(dialog, 'open');
 
@@ -83,8 +83,30 @@ describe('openDropdownOptionsDialog', () => {
 
     const [component, config] = open.mock.calls[0];
     expect(component).toBe(DropdownOptionsDialog);
-    expect(config?.ariaLabel).toBe('Dropdown options');
+    expect(config?.ariaLabelledBy).toBe(`${config?.id}-title`);
+    expect(config?.ariaDescribedBy).toBe(`${config?.id}-description`);
     expect(config?.bindings).toHaveLength(3);
+    dialog.closeAll();
+  });
+
+  it('references no description when none is given', () => {
+    const dialog = TestBed.inject(Dialog);
+    const open = vi.spyOn(dialog, 'open');
+
+    openDropdownOptionsDialog(dialog, { title: 'Dropdown options' });
+
+    expect(open.mock.calls[0][1]?.ariaDescribedBy).toBeNull();
+    dialog.closeAll();
+  });
+
+  it('returns focus to the given element', () => {
+    const dialog = TestBed.inject(Dialog);
+    const open = vi.spyOn(dialog, 'open');
+    const restoreFocus = document.createElement('button');
+
+    openDropdownOptionsDialog(dialog, { title: 'Dropdown options', restoreFocus });
+
+    expect(open.mock.calls[0][1]?.restoreFocus).toBe(restoreFocus);
     dialog.closeAll();
   });
 });

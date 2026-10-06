@@ -1,7 +1,9 @@
-import { Dialog } from '@angular/cdk/dialog';
-import { TestBed } from '@angular/core/testing';
+import { Dialog, DialogConfig } from '@angular/cdk/dialog';
+import { signal, WritableSignal } from '@angular/core';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Observable, of } from 'rxjs';
 import { DropdownOption } from '../models/dropdown-option';
+import { GridCell } from '../models/grid-layout';
 import {
   CanvasElement,
   DatepickerCanvasElement,
@@ -48,20 +50,33 @@ describe('DroppedElement', () => {
   };
 
   let store: {
+    canvasElements: WritableSignal<CanvasElement[]>;
+    cells: WritableSignal<GridCell[]>;
     updateText: ReturnType<typeof vi.fn>;
     updateOptions: ReturnType<typeof vi.fn>;
     updateValue: ReturnType<typeof vi.fn>;
     removeElement: ReturnType<typeof vi.fn>;
+    moveElement: ReturnType<typeof vi.fn>;
   };
   let dialogResult: Observable<string | true | DropdownOption[] | undefined>;
+  let openDialog: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    store = { updateText: vi.fn(), updateOptions: vi.fn(), updateValue: vi.fn(), removeElement: vi.fn() };
+    store = {
+      canvasElements: signal([]),
+      cells: signal([]),
+      updateText: vi.fn(),
+      updateOptions: vi.fn(),
+      updateValue: vi.fn(),
+      removeElement: vi.fn(),
+      moveElement: vi.fn(),
+    };
     dialogResult = of(undefined);
+    openDialog = vi.fn(() => ({ closed: dialogResult }));
     TestBed.configureTestingModule({
       providers: [
         { provide: BuilderStore, useValue: store },
-        { provide: Dialog, useValue: { open: () => ({ closed: dialogResult }) } },
+        { provide: Dialog, useValue: { open: openDialog } },
       ],
     });
   });
@@ -71,6 +86,14 @@ describe('DroppedElement', () => {
     fixture.componentRef.setInput('element', element);
     fixture.detectChanges();
     return fixture;
+  }
+
+  function actionsButton(fixture: ComponentFixture<DroppedElement>): HTMLButtonElement {
+    return (fixture.nativeElement as HTMLElement).querySelector('button')!;
+  }
+
+  function restoreFocusTarget(): unknown {
+    return (openDialog.mock.calls[0][1] as DialogConfig).restoreFocus;
   }
 
   describe('hover outline', () => {
@@ -110,6 +133,32 @@ describe('DroppedElement', () => {
 
       expect(classes).toContain('cursor-grab');
     });
+
+    it.each([
+      { element: div, outline: 'border-primary/40' },
+      { element: span, outline: 'border-secondary' },
+      { element: textInput, outline: 'border-info' },
+      { element: textfield, outline: 'border-info' },
+      { element: datepicker, outline: 'border-info' },
+      { element: dropdown, outline: 'border-accent' },
+    ])('shows a $element.type the same outline while focus is inside it', ({ element, outline }) => {
+      const classes = (create(element).nativeElement as HTMLElement).classList;
+
+      expect(classes).toContain(`hover:${outline}`);
+      expect(classes).toContain(`focus-within:${outline}`);
+    });
+  });
+
+  describe('focusActions', () => {
+    it('moves focus to the actions button', () => {
+      const fixture = create(div);
+      document.body.appendChild(fixture.nativeElement);
+
+      fixture.componentInstance.focusActions();
+
+      expect(document.activeElement).toBe(actionsButton(fixture));
+      fixture.nativeElement.remove();
+    });
   });
 
   describe('display', () => {
@@ -142,6 +191,14 @@ describe('DroppedElement', () => {
 
       expect(store.updateText).not.toHaveBeenCalled();
     });
+
+    it('returns focus to the actions button when the dialog closes', () => {
+      const fixture = create(div);
+
+      fixture.componentInstance['editText'](div);
+
+      expect(restoreFocusTarget()).toBe(actionsButton(fixture));
+    });
   });
 
   describe('editOptions', () => {
@@ -162,6 +219,14 @@ describe('DroppedElement', () => {
       create(dropdown).componentInstance['editOptions'](dropdown);
 
       expect(store.updateOptions).not.toHaveBeenCalled();
+    });
+
+    it('returns focus to the actions button when the dialog closes', () => {
+      const fixture = create(dropdown);
+
+      fixture.componentInstance['editOptions'](dropdown);
+
+      expect(restoreFocusTarget()).toBe(actionsButton(fixture));
     });
   });
 
@@ -202,6 +267,83 @@ describe('DroppedElement', () => {
       create(div).componentInstance['deleteElement']();
 
       expect(store.removeElement).not.toHaveBeenCalled();
+    });
+
+    it('reports the removal once the user confirms', () => {
+      dialogResult = of(true);
+      const removed = vi.fn();
+      const fixture = create(div);
+      fixture.componentInstance.removed.subscribe(removed);
+
+      fixture.componentInstance['deleteElement']();
+
+      expect(removed).toHaveBeenCalledTimes(1);
+    });
+
+    it('reports no removal when the user cancels', () => {
+      const removed = vi.fn();
+      const fixture = create(div);
+      fixture.componentInstance.removed.subscribe(removed);
+
+      fixture.componentInstance['deleteElement']();
+
+      expect(removed).not.toHaveBeenCalled();
+    });
+
+    it('returns focus to the actions button when the dialog closes', () => {
+      const fixture = create(div);
+
+      fixture.componentInstance['deleteElement']();
+
+      expect(restoreFocusTarget()).toBe(actionsButton(fixture));
+    });
+  });
+
+  describe('moving', () => {
+    const first: TextCanvasElement = { ...div, uid: 'first' };
+    const second: TextCanvasElement = { ...div, uid: 'second' };
+    const third: TextCanvasElement = { ...div, uid: 'third' };
+    const elsewhere: TextCanvasElement = { ...div, uid: 'elsewhere', row: 0, column: 1 };
+    const otherCell: GridCell = { row: 0, column: 1, elements: [elsewhere] };
+
+    beforeEach(() => store.canvasElements.set([first, elsewhere, second, third]));
+
+    it('moves an element one place earlier among the elements of its own cell', () => {
+      create(third).componentInstance['moveWithinCell'](-1);
+
+      expect(store.moveElement).toHaveBeenCalledWith(third.uid, cell, 1);
+    });
+
+    it('moves an element one place later among the elements of its own cell', () => {
+      create(first).componentInstance['moveWithinCell'](1);
+
+      expect(store.moveElement).toHaveBeenCalledWith(first.uid, cell, 1);
+    });
+
+    it('moves an element to the end of another cell', () => {
+      create(first).componentInstance['moveToCell'](otherCell);
+
+      expect(store.moveElement).toHaveBeenCalledWith(first.uid, otherCell, 1);
+    });
+
+    it('reports a move within its cell', () => {
+      const moved = vi.fn();
+      const fixture = create(first);
+      fixture.componentInstance.moved.subscribe(moved);
+
+      fixture.componentInstance['moveWithinCell'](1);
+
+      expect(moved).toHaveBeenCalledTimes(1);
+    });
+
+    it('reports a move to another cell', () => {
+      const moved = vi.fn();
+      const fixture = create(first);
+      fixture.componentInstance.moved.subscribe(moved);
+
+      fixture.componentInstance['moveToCell'](otherCell);
+
+      expect(moved).toHaveBeenCalledTimes(1);
     });
   });
 });

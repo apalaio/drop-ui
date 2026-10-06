@@ -1,3 +1,4 @@
+import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { TestBed } from '@angular/core/testing';
 import themeOrder from 'daisyui/functions/themeOrder';
 import { ALL_THEMES_STYLESHEET, THEMES, ThemeStore } from './theme-store';
@@ -139,6 +140,24 @@ describe('ThemeStore', () => {
       expect(store.theme()).toBe(startingTheme);
       expect(appliedTheme()).toBe(startingTheme);
       expect(allThemesStylesheets()).toEqual([]);
+    });
+
+    it('announces the selected theme', () => {
+      const announce = vi.spyOn(TestBed.inject(LiveAnnouncer), 'announce');
+      const store = TestBed.inject(ThemeStore);
+
+      store.setTheme(otherTheme);
+
+      expect(announce).toHaveBeenCalledWith(`Theme changed to ${otherTheme}.`);
+    });
+
+    it('announces nothing for a theme daisyUI does not ship', () => {
+      const announce = vi.spyOn(TestBed.inject(LiveAnnouncer), 'announce');
+      const store = TestBed.inject(ThemeStore);
+
+      store.setTheme(unknownTheme);
+
+      expect(announce).not.toHaveBeenCalled();
     });
   });
 });

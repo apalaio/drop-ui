@@ -1,6 +1,8 @@
 @import 'tailwindcss';
 /* Positioning and backdrops for CDK overlays: the element actions menu and dialogs. */
 @import '@angular/cdk/overlay-prebuilt.css';
+/* Hides the live region LiveAnnouncer speaks through; CDK only loads this itself once a dialog opens. */
+@import '@angular/cdk/a11y-prebuilt.css';
 /*
  * No theme is built into this file. `index.html` links the CSS of the theme the app starts in, and
  * ThemeStore fetches the rest on demand; both are daisyUI's prebuilt files, copied as assets.
@@ -23,8 +25,11 @@
   @apply opacity-100;
 }
 
-.cdk-drag-animating {
-  transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
+/* Without a transition CDK drops the item in place at once, which is what reduced motion asks for. */
+@media (prefers-reduced-motion: no-preference) {
+  .cdk-drag-animating {
+    transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
+  }
 }
 
 .canvas-drop-zone.cdk-drop-list-receiving {

@@ -1,8 +1,10 @@
-import { computed } from '@angular/core';
+import { LiveAnnouncer } from '@angular/cdk/a11y';
+import { computed, inject } from '@angular/core';
 import { patchState, signalStore, withComputed, withMethods, withState } from '@ngrx/signals';
 import { DropdownOption } from '../models/dropdown-option';
 import { CanvasElement } from '../models/canvas-element';
 import {
+  cellLabel,
   CellPosition,
   GridAxis,
   GridCell,
@@ -10,7 +12,7 @@ import {
   MAX_GRID_SIZE,
   MIN_GRID_SIZE,
 } from '../models/grid-layout';
-import { PaletteItem } from '../models/palette-item';
+import { ELEMENT_LABELS, PaletteItem } from '../models/palette-item';
 
 interface BuilderState {
   paletteItems: PaletteItem[];
@@ -22,12 +24,12 @@ export const DEFAULT_ELEMENT_TEXT = 'enter text';
 
 const createInitialState = (): BuilderState => ({
   paletteItems: [
-    { uid: crypto.randomUUID(), type: 'div', label: 'Block text' },
-    { uid: crypto.randomUUID(), type: 'span', label: 'Inline text' },
-    { uid: crypto.randomUUID(), type: 'text-input', label: 'Text input' },
-    { uid: crypto.randomUUID(), type: 'textfield', label: 'Textfield' },
-    { uid: crypto.randomUUID(), type: 'datepicker', label: 'Datepicker' },
-    { uid: crypto.randomUUID(), type: 'dropdown', label: 'Dropdown' },
+    { uid: crypto.randomUUID(), type: 'div', label: ELEMENT_LABELS.div },
+    { uid: crypto.randomUUID(), type: 'span', label: ELEMENT_LABELS.span },
+    { uid: crypto.randomUUID(), type: 'text-input', label: ELEMENT_LABELS['text-input'] },
+    { uid: crypto.randomUUID(), type: 'textfield', label: ELEMENT_LABELS.textfield },
+    { uid: crypto.randomUUID(), type: 'datepicker', label: ELEMENT_LABELS.datepicker },
+    { uid: crypto.randomUUID(), type: 'dropdown', label: ELEMENT_LABELS.dropdown },
   ],
   grid: { rows: 1, columns: 1 },
   canvasElements: [],
@@ -66,6 +68,11 @@ const clampGridSize = (size: number): number =>
 const isInCell = (element: CanvasElement, { row, column }: CellPosition): boolean =>
   element.row === row && element.column === column;
 
+const positionInCell = (elements: CanvasElement[], element: CanvasElement): number =>
+  elements.filter((other) => isInCell(other, element)).indexOf(element);
+
+const countOf = (count: number, noun: string): string => `${count} ${noun}${count === 1 ? '' : 's'}`;
+
 const insertIntoCell = (
   elements: CanvasElement[],
   element: CanvasElement,
@@ -92,7 +99,11 @@ export const BuilderStore = signalStore(
       });
     }),
   })),
-  withMethods((store) => ({
+  /*
+   * Changes to the canvas are announced here rather than by the component that asked for them, so
+   * a drag and its keyboard alternative report the same outcome to screen reader users.
+   */
+  withMethods((store, announcer = inject(LiveAnnouncer)) => ({
     setGridSize(axis: GridAxis, size: number): void {
       if (!Number.isFinite(size)) {
         return;
@@ -105,12 +116,15 @@ export const BuilderStore = signalStore(
           element[position] > last ? { ...element, [position]: last } : element,
         ),
       }));
+      const { rows, columns } = store.grid();
+      announcer.announce(`Grid set to ${countOf(rows, 'row')} and ${countOf(columns, 'column')}.`);
     },
     addElement(item: PaletteItem, cell: CellPosition, index: number): void {
       const element = createElement(item, cell);
       patchState(store, ({ canvasElements }) => ({
         canvasElements: insertIntoCell(canvasElements, element, index),
       }));
+      announcer.announce(`${item.label} added to ${cellLabel(cell)}.`);
     },
     updateText(uid: string, text: string): void {
       patchState(store, ({ canvasElements }) => ({
@@ -142,20 +156,40 @@ export const BuilderStore = signalStore(
       }));
     },
     removeElement(uid: string): void {
+      const element = store.canvasElements().find((candidate) => candidate.uid === uid);
+      if (!element) {
+        return;
+      }
       patchState(store, ({ canvasElements }) => ({
-        canvasElements: canvasElements.filter((element) => element.uid !== uid),
+        canvasElements: canvasElements.filter((candidate) => candidate !== element),
       }));
+      announcer.announce(`${ELEMENT_LABELS[element.type]} deleted.`);
     },
     moveElement(uid: string, cell: CellPosition, index: number): void {
-      patchState(store, ({ canvasElements }) => {
-        const element = canvasElements.find((candidate) => candidate.uid === uid);
-        if (!element) {
-          return {};
-        }
-        const moved: CanvasElement = { ...element, row: cell.row, column: cell.column };
-        const others = canvasElements.filter((candidate) => candidate !== element);
-        return { canvasElements: insertIntoCell(others, moved, index) };
-      });
+      const element = store.canvasElements().find((candidate) => candidate.uid === uid);
+      if (!element) {
+        return;
+      }
+      const previousPosition = positionInCell(store.canvasElements(), element);
+      const moved: CanvasElement = { ...element, row: cell.row, column: cell.column };
+      patchState(store, ({ canvasElements }) => ({
+        canvasElements: insertIntoCell(
+          canvasElements.filter((candidate) => candidate !== element),
+          moved,
+          index,
+        ),
+      }));
+
+      const label = ELEMENT_LABELS[element.type];
+      if (!isInCell(element, cell)) {
+        announcer.announce(`${label} moved to ${cellLabel(cell)}.`);
+        return;
+      }
+      const position = positionInCell(store.canvasElements(), moved);
+      if (position !== previousPosition) {
+        const count = store.canvasElements().filter((other) => isInCell(other, cell)).length;
+        announcer.announce(`${label} moved to position ${position + 1} of ${count}.`);
+      }
     },
   })),
 );

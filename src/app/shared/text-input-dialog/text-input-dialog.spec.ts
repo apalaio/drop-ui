@@ -40,7 +40,7 @@ describe('TextInputDialog', () => {
 });
 
 describe('openTextInputDialog', () => {
-  it('opens the dialog with the given inputs, labelled by its title', () => {
+  it('opens the dialog with the given inputs, labelled by its title and described by its description', () => {
     const dialog = TestBed.inject(Dialog);
     const open = vi.spyOn(dialog, 'open');
 
@@ -48,8 +48,30 @@ describe('openTextInputDialog', () => {
 
     const [component, config] = open.mock.calls[0];
     expect(component).toBe(TextInputDialog);
-    expect(config?.ariaLabel).toBe('Edit text');
+    expect(config?.ariaLabelledBy).toBe(`${config?.id}-title`);
+    expect(config?.ariaDescribedBy).toBe(`${config?.id}-description`);
     expect(config?.bindings).toHaveLength(3);
+    dialog.closeAll();
+  });
+
+  it('references no description when none is given', () => {
+    const dialog = TestBed.inject(Dialog);
+    const open = vi.spyOn(dialog, 'open');
+
+    openTextInputDialog(dialog, { title: 'Edit text' });
+
+    expect(open.mock.calls[0][1]?.ariaDescribedBy).toBeNull();
+    dialog.closeAll();
+  });
+
+  it('returns focus to the given element', () => {
+    const dialog = TestBed.inject(Dialog);
+    const open = vi.spyOn(dialog, 'open');
+    const restoreFocus = document.createElement('button');
+
+    openTextInputDialog(dialog, { title: 'Edit text', restoreFocus });
+
+    expect(open.mock.calls[0][1]?.restoreFocus).toBe(restoreFocus);
     dialog.closeAll();
   });
 });

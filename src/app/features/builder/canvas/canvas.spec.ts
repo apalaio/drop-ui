@@ -73,4 +73,37 @@ describe('Canvas', () => {
     expect(store.moveElement).toHaveBeenCalledWith(element.uid, expect.objectContaining({ row: 1, column: 1 }), 1);
     expect(store.addElement).not.toHaveBeenCalled();
   });
+
+  describe('focusCell', () => {
+    let cell: HTMLElement;
+
+    beforeEach(() => {
+      cell = document.createElement('div');
+      cell.tabIndex = -1;
+      document.body.appendChild(cell);
+    });
+
+    afterEach(() => cell.remove());
+
+    it('focuses the cell once the removal has rendered', () => {
+      canvas['focusCell'](cell);
+      TestBed.tick();
+
+      expect(document.activeElement).toBe(cell);
+    });
+
+    it('leaves focus alone until then, as the dialog that asked is still handing it back', () => {
+      canvas['focusCell'](cell);
+
+      expect(document.activeElement).not.toBe(cell);
+    });
+  });
+
+  describe('focusElement', () => {
+    it('does nothing when the element is no longer on the canvas', () => {
+      canvas['focusElement']('no-such-element');
+
+      expect(() => TestBed.tick()).not.toThrow();
+    });
+  });
 });

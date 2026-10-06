@@ -1,3 +1,4 @@
+import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { TestBed } from '@angular/core/testing';
 import { MAX_GRID_SIZE, MIN_GRID_SIZE } from '../models/grid-layout';
 import { ElementType } from '../models/palette-item';
@@ -607,6 +608,82 @@ describe('BuilderStore', () => {
       expect(store.canvasElements().length).toBe(3);
       expect(uidsIn(store, 0, 0)).toEqual([a, b]);
       expect(uidsIn(store, 0, 1)).toEqual([c]);
+    });
+  });
+
+  describe('announcements', () => {
+    let announce: ReturnType<typeof vi.spyOn>;
+    let store: Store;
+
+    beforeEach(() => {
+      announce = vi.spyOn(TestBed.inject(LiveAnnouncer), 'announce');
+      store = TestBed.inject(BuilderStore);
+    });
+
+    it('announces an added element by its palette label and cell', () => {
+      store.setGridSize('columns', 2);
+
+      store.addElement(store.paletteItems()[0], { row: 0, column: 1 }, 0);
+
+      expect(announce).toHaveBeenLastCalledWith('Block text added to Row 1, column 2.');
+    });
+
+    it('announces the cell an element was moved to', () => {
+      store.setGridSize('rows', 2);
+      const uid = addOfType(store, 'dropdown');
+
+      store.moveElement(uid, { row: 1, column: 0 }, 0);
+
+      expect(announce).toHaveBeenLastCalledWith('Dropdown moved to Row 2, column 1.');
+    });
+
+    it('announces the new position of an element reordered within its cell', () => {
+      const [first] = [addTo(store, 0, 0), addTo(store, 0, 0), addTo(store, 0, 0)];
+
+      store.moveElement(first, origin, 1);
+
+      expect(announce).toHaveBeenLastCalledWith('Block text moved to position 2 of 3.');
+    });
+
+    it('stays silent when an element is dropped back where it was', () => {
+      const [first] = [addTo(store, 0, 0), addTo(store, 0, 0)];
+      announce.mockClear();
+
+      store.moveElement(first, origin, 0);
+
+      expect(announce).not.toHaveBeenCalled();
+    });
+
+    it('stays silent when asked to move an unknown element', () => {
+      store.moveElement('no-such-element', origin, 0);
+
+      expect(announce).not.toHaveBeenCalled();
+    });
+
+    it('announces a deleted element by its label', () => {
+      const uid = addOfType(store, 'text-input');
+
+      store.removeElement(uid);
+
+      expect(announce).toHaveBeenLastCalledWith('Text input deleted.');
+    });
+
+    it('stays silent when asked to delete an unknown element', () => {
+      store.removeElement('no-such-element');
+
+      expect(announce).not.toHaveBeenCalled();
+    });
+
+    it('announces the grid size that took effect, which may not be the one asked for', () => {
+      store.setGridSize('rows', 99);
+
+      expect(announce).toHaveBeenLastCalledWith(`Grid set to ${MAX_GRID_SIZE} rows and 1 column.`);
+    });
+
+    it('stays silent when the grid size is not a number', () => {
+      store.setGridSize('rows', NaN);
+
+      expect(announce).not.toHaveBeenCalled();
     });
   });
 });

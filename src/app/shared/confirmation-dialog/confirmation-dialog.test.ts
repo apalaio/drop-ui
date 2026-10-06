@@ -8,6 +8,7 @@ import {
 } from './confirmation-dialog';
 
 const title = 'Delete element';
+const description = 'This cannot be undone.';
 const confirmLabel = 'Delete';
 
 @Component({
@@ -22,15 +23,13 @@ class DialogHost {
   protected readonly result = signal('');
 
   protected open(): void {
-    openConfirmationDialog(this.dialog, { title, confirmLabel }).subscribe((confirmed) =>
-      this.result.set(String(confirmed)),
+    openConfirmationDialog(this.dialog, { title, description, confirmLabel }).subscribe(
+      (confirmed) => this.result.set(String(confirmed)),
     );
   }
 }
 
 describe(ConfirmationDialog.name, () => {
-  const description = 'This cannot be undone.';
-
   async function mount(inputs: { description?: string; confirmLabel?: string } = {}) {
     return render(ConfirmationDialog, {
       inputs: { title, ...inputs },
@@ -75,22 +74,37 @@ describe(ConfirmationDialog.name, () => {
   describe('when opened', () => {
     beforeEach(async () => {
       await render(DialogHost);
+      screen.getByRole('button', { name: 'Open' }).focus();
       fireEvent.click(screen.getByRole('button', { name: 'Open' }));
-      await screen.findByRole('dialog', { name: title });
+      await screen.findByRole('alertdialog', { name: title });
+    });
+
+    it('should be described by its description', () => {
+      expect(screen.getByRole('alertdialog')).toHaveAccessibleDescription(description);
+    });
+
+    it('should start on the cancel button, the safe choice', async () => {
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus());
     });
 
     it('should close confirmed when the confirm button is clicked', async () => {
       fireEvent.click(screen.getByRole('button', { name: confirmLabel }));
 
-      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
       expect(screen.getByRole('status')).toHaveTextContent('true');
     });
 
     it('should close unconfirmed when cancelled', async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 
-      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
       expect(screen.getByRole('status')).toHaveTextContent('false');
+    });
+
+    it('should return focus to the button that opened it', async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Open' })).toHaveFocus());
     });
   });
 });
