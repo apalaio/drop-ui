@@ -129,16 +129,16 @@ describe('DroppedElement', () => {
   });
 
   describe('editText', () => {
-    it('stores the text the user saved', () => {
+    it('stores the text the user saved', async () => {
       dialogResult = of('Hello');
 
-      create(div).componentInstance['editText'](div);
+      await create(div).componentInstance['editText'](div);
 
       expect(store.updateText).toHaveBeenCalledWith(div.uid, 'Hello');
     });
 
-    it('leaves the text unchanged when the user cancels', () => {
-      create(div).componentInstance['editText'](div);
+    it('leaves the text unchanged when the user cancels', async () => {
+      await create(div).componentInstance['editText'](div);
 
       expect(store.updateText).not.toHaveBeenCalled();
     });
@@ -150,16 +150,16 @@ describe('DroppedElement', () => {
       { text: 'Large', value: 'l' },
     ];
 
-    it('stores the options the user saved', () => {
+    it('stores the options the user saved', async () => {
       dialogResult = of(saved);
 
-      create(dropdown).componentInstance['editOptions'](dropdown);
+      await create(dropdown).componentInstance['editOptions'](dropdown);
 
       expect(store.updateOptions).toHaveBeenCalledWith(dropdown.uid, saved);
     });
 
-    it('leaves the options unchanged when the user cancels', () => {
-      create(dropdown).componentInstance['editOptions'](dropdown);
+    it('leaves the options unchanged when the user cancels', async () => {
+      await create(dropdown).componentInstance['editOptions'](dropdown);
 
       expect(store.updateOptions).not.toHaveBeenCalled();
     });

@@ -2,8 +2,6 @@ import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { Component, computed, inject, input } from '@angular/core';
 import { openConfirmationDialog } from '../../../shared/confirmation-dialog/confirmation-dialog';
-import { openDropdownOptionsDialog } from '../dropdown-options-dialog/dropdown-options-dialog';
-import { openTextInputDialog } from '../../../shared/text-input-dialog/text-input-dialog';
 import {
   CanvasElement,
   DropdownCanvasElement,
@@ -44,7 +42,17 @@ export class DroppedElement {
   private readonly store = inject(BuilderStore);
   private readonly dialog = inject(Dialog);
 
-  protected editText({ uid, type, text }: TextCanvasElement | TextControlCanvasElement): void {
+  /*
+   * The two form dialogs are imported when first opened: they are the only users of signal forms,
+   * which would otherwise add about 60 kB to the initial bundle for an occasional action.
+   */
+  protected async editText({
+    uid,
+    type,
+    text,
+  }: TextCanvasElement | TextControlCanvasElement): Promise<void> {
+    const { openTextInputDialog } =
+      await import('../../../shared/text-input-dialog/text-input-dialog');
     openTextInputDialog(this.dialog, {
       title: 'Edit text',
       description: `Change the text shown inside this <${type}>.`,
@@ -56,7 +64,9 @@ export class DroppedElement {
     });
   }
 
-  protected editOptions({ uid, type, options }: DropdownCanvasElement): void {
+  protected async editOptions({ uid, type, options }: DropdownCanvasElement): Promise<void> {
+    const { openDropdownOptionsDialog } =
+      await import('../dropdown-options-dialog/dropdown-options-dialog');
     openDropdownOptionsDialog(this.dialog, {
       title: 'Edit options',
       description: `Set the text and value of each option in this <${type}>.`,

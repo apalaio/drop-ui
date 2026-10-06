@@ -1,6 +1,12 @@
-@import 'tailwindcss';
+/*
+ * Automatic source detection is off: it scans the whole repository, and every word in the docs and
+ * tests that happens to name a daisyUI component (tabs, steps, table, ...) ships that component.
+ */
+@import 'tailwindcss' source(none);
 /* Positioning and backdrops for CDK overlays: the element actions menu and dialogs. */
 @import '@angular/cdk/overlay-prebuilt.css';
+@source './**/*.{html,ts}';
+@source not './**/*.{spec,test}.ts';
 /*
  * No theme is built into this file. `index.html` links the CSS of the theme the app starts in, and
  * ThemeStore fetches the rest on demand; both are daisyUI's prebuilt files, copied as assets.
