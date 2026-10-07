@@ -1,9 +1,11 @@
 <h2 class="mb-2 text-xs font-semibold tracking-wide text-base-content/70 uppercase">Layout</h2>
 
 <ul class="flex w-full flex-col gap-1">
-  <li class="flex items-center justify-between gap-2 rounded-field border border-base-300 bg-base-100 px-3 py-1.5 text-sm">
+  <li
+    class="flex items-center justify-between gap-2 rounded-field border border-base-300 bg-base-100 px-3 py-1.5 text-sm"
+  >
     <span>Grid</span>
-    <!-- The × is generated content, so the entry's text stays just "Grid". -->
+
     <span class="flex items-center gap-1 text-xs text-base-content/70">
       <input
         #rows
@@ -16,7 +18,7 @@
         (change)="commit('rows', rows)"
         (blur)="show('rows', rows)"
       />
-      <span class="before:content-['×']" aria-hidden="true"></span>
+      <span aria-hidden="true">x</span>
       <input
         #columns
         type="number"
